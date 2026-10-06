@@ -5,6 +5,7 @@ import asr from "../../../crates/cog-market/catalog/guides/asr.json";
 import assistant from "../../../crates/cog-market/catalog/guides/assistant.json";
 import audioIn from "../../../crates/cog-market/catalog/guides/audio-in.json";
 import audioOut from "../../../crates/cog-market/catalog/guides/audio-out.json";
+import bme680 from "../../../crates/cog-market/catalog/guides/bme680.json";
 import boardTelemetry from "../../../crates/cog-market/catalog/guides/board-telemetry.json";
 import bridge from "../../../crates/cog-market/catalog/guides/bridge.json";
 import camera from "../../../crates/cog-market/catalog/guides/camera.json";
@@ -31,6 +32,7 @@ export const GUIDES: Record<string, unknown> = {
   "assistant": assistant as unknown,
   "audio-in": audioIn as unknown,
   "audio-out": audioOut as unknown,
+  "bme680": bme680 as unknown,
   "board-telemetry": boardTelemetry as unknown,
   "bridge": bridge as unknown,
   "camera": camera as unknown,

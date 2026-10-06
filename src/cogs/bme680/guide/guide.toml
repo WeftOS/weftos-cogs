@@ -1,0 +1,87 @@
+# Sensor guide for bme680 (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are guide/<page>.md. ```diagram fences embed: header | wiring | flow.
+
+schema = 1
+title = "BME680 on a Cognitum Seed"
+sensor = "Bosch Sensortec BME680 (purple breakout, chip mark BME680)"
+cog = "bme680"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "sensor", "parts", "wiring", "setup", "calibrate", "troubleshoot", "api", "safety", "glossary"]
+
+[links]
+sensor_found = "wiring"
+frames = "troubleshoot"
+cog_installed = "setup"
+cog_running = "setup"
+export = "api"
+
+[header]
+board = "Raspberry Pi Zero 2 W (Cognitum Seed)"
+orientation = "Header along the top edge, SD card on the left: pin 1 is the top-left pin of the inner row."
+use = [
+  { pin = 1, name = "3V3", to = "breakout VDD", color = "red" },
+  { pin = 3, name = "GPIO2 SDA", to = "breakout SDI (SDA)", color = "green" },
+  { pin = 5, name = "GPIO3 SCL", to = "breakout SCK (SCL)", color = "blue" },
+  { pin = 6, name = "GND", to = "breakout GND", color = "black" },
+]
+avoid = [
+  { pin = 2, why = "5 V. The BME680 supply and the Pi GPIO are not 5 V tolerant. This lane could not see a regulator on the purple board." },
+  { pin = 4, why = "5 V" },
+]
+
+[[parts]]
+id = "sensor"
+name = "BME680 breakout"
+detail = "Purple breakout, chip marked BME680. Silkscreen names were not read."
+pins = ["VDD", "GND", "SCK", "SDI", "SDO", "CSB"]
+
+[[parts]]
+id = "seed"
+name = "Seed header"
+detail = "Pi Zero 2 W, I2C bus 1"
+pins = ["1 3V3", "3 SDA", "5 SCL", "6 GND"]
+
+[[wires]]
+from = "sensor.VDD"
+to = "seed.1 3V3"
+color = "red"
+label = "3.3 V only"
+
+[[wires]]
+from = "sensor.GND"
+to = "seed.6 GND"
+color = "black"
+label = "GND"
+
+[[wires]]
+from = "sensor.SCK"
+to = "seed.5 SCL"
+color = "blue"
+label = "SCL"
+
+[[wires]]
+from = "sensor.SDI"
+to = "seed.3 SDA"
+color = "green"
+label = "SDA"
+
+[[flow]]
+name = "Air"
+detail = "T, RH, P, gas"
+
+[[flow]]
+name = "BME680"
+detail = "I2C 0x76 or 0x77"
+
+[[flow]]
+name = "I2C bus 1"
+detail = "/dev/i2c-1"
+
+[[flow]]
+name = "bme680 cog"
+detail = "forced mode, compensation"
+
+[[flow]]
+name = "SenML"
+detail = "stdout and 127.0.0.1:8057"

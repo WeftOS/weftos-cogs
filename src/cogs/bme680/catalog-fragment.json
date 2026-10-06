@@ -1,0 +1,49 @@
+{
+  "note": "Not applied to the WeftOS catalog. catalog.json was not edited. Paste only after that catalog's own validator accepts it. Specs are vendor figures from BST-BME680-DS001-09 revision 1.9 (February 2024), not measurements. Hardware not yet tested.",
+  "project": {
+    "id": "bme680",
+    "name": "BME680 environment",
+    "category": "signal",
+    "difficulty": "easy",
+    "summary": "Bosch BME680 temperature, humidity, pressure and gas resistance over I2C. SenML object readings. Not presence and not an air-quality index.",
+    "export_port": 8057,
+    "simulate": true,
+    "guide": "/guide",
+    "modules": ["bme680-breakout", "pi-zero-2w"]
+  },
+  "module": {
+    "id": "bme680-breakout",
+    "name": "Bosch BME680 breakout (purple)",
+    "vendor": "Bosch Sensortec",
+    "kind": "sensor",
+    "summary": "BME680 gas, pressure, humidity and temperature sensor on a purple breakout. I2C 0x76 or 0x77. Chip mark BME680.",
+    "good_for": [
+      "board-local temperature, humidity and pressure",
+      "raw gas-sensor resistance in ohms"
+    ],
+    "not_for": [
+      "presence, tracks or bounding boxes",
+      "IAQ, CO2 or breath-VOC (those are BSEC, not this cog)",
+      "5 V power until a regulator is confirmed on this board"
+    ],
+    "spec": {
+      "interface": "I2C 0x76 (SDO low) or 0x77 (SDO high); SPI exists and is not used",
+      "vdd": "1.71-3.6 V",
+      "vddio": "1.2-3.6 V",
+      "absolute_max_supply": "4.25 V",
+      "chip_id": "0x61 at register 0xD0",
+      "quantities": "temperature Cel, humidity %RH, pressure Pa, gas resistance Ohm",
+      "source": "BST-BME680-DS001-09 revision 1.9, February 2024 (vendor, not our measurement)",
+      "unconfirmed_on_this_board": "regulator versus raw 3.3 V header, silkscreen names, SDO strap, CSB strap"
+    },
+    "pins": ["VDD", "GND", "SCK", "SDI", "SDO", "CSB"],
+    "chips": ["bme680"],
+    "datasheet": "BST-BME680-DS001-09"
+  },
+  "chip": {
+    "id": "bme680",
+    "name": "BME680",
+    "vendor": "Bosch Sensortec",
+    "summary": "Integrated gas, pressure, humidity and temperature sensor, I2C or SPI."
+  }
+}

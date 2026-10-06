@@ -12,6 +12,7 @@ pub const GUIDES: &[(&str, &str)] = &[
     ("assistant", include_str!("../catalog/guides/assistant.json")),
     ("audio-in", include_str!("../catalog/guides/audio-in.json")),
     ("audio-out", include_str!("../catalog/guides/audio-out.json")),
+    ("bme680", include_str!("../catalog/guides/bme680.json")),
     ("board-telemetry", include_str!("../catalog/guides/board-telemetry.json")),
     ("bridge", include_str!("../catalog/guides/bridge.json")),
     ("camera", include_str!("../catalog/guides/camera.json")),
