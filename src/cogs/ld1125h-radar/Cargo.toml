@@ -1,0 +1,31 @@
+[workspace]
+
+[package]
+name = "cog-ld1125h-radar"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Hi-Link HLK-LD1125H-24G 24 GHz FMCW presence radar over UART (115200 8N1 ASCII mov/occ lines). Distance in metres. No heart rate, no breathing rate, no configuration writes."
+
+[[bin]]
+name = "cog-ld1125h-radar"
+path = "src/main.rs"
+
+[dependencies]
+cog-sensor-sources = { path = "../../../crates/cog-sensor-sources" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+libc = "0.2"
+
+# Off by default. The default build's code and dependencies do not include it.
+# `spatial-evidence` adds the spatial.evidence.v1 radar_range adapter (src/spatial.rs).
+[features]
+default = []
+spatial-evidence = []
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

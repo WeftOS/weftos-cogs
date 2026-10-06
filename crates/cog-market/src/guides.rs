@@ -19,6 +19,7 @@ pub const GUIDES: &[(&str, &str)] = &[
     ("can-fd", include_str!("../catalog/guides/can-fd.json")),
     ("hlk-as201", include_str!("../catalog/guides/hlk-as201.json")),
     ("ld1040c-motion", include_str!("../catalog/guides/ld1040c-motion.json")),
+    ("ld1125h-radar", include_str!("../catalog/guides/ld1125h-radar.json")),
     ("ld2450-radar", include_str!("../catalog/guides/ld2450-radar.json")),
     ("ld6004-radar", include_str!("../catalog/guides/ld6004-radar.json")),
     ("mcu-bridge", include_str!("../catalog/guides/mcu-bridge.json")),

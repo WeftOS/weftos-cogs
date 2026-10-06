@@ -1,0 +1,84 @@
+# Sensor guide for ld1125h-radar (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are guide/<page>.md. ```diagram fences embed: header | wiring | flow.
+
+schema = 1
+title = "HLK-LD1125H-24G presence radar on a Cognitum Seed"
+sensor = "Hi-Link HLK-LD1125H-24G 24 GHz FMCW human-presence radar"
+cog = "ld1125h-radar"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "sensor", "parts", "wiring", "mounting", "setup", "troubleshoot", "api", "safety", "glossary"]
+
+[links]
+seed_api = "setup"
+cog_installed = "setup"
+cog_running = "setup"
+export = "setup"
+uart = "wiring"
+distance = "sensor"
+silence = "troubleshoot"
+mount = "mounting"
+
+[header]
+board = "Raspberry Pi Zero 2 W (Cognitum Seed)"
+orientation = "Header along the top edge, ports along the bottom, micro-SD on the left. Pin 1 (3.3 V) is the left pin of the inner row. The outer row is the even pins 2-40."
+use = [
+  { pin = 2, name = "5V", to = "module VCC (silk 5V)", color = "red" },
+  { pin = 6, name = "GND", to = "module GND (silk G)", color = "black" },
+  { pin = 10, name = "GPIO15 RXD", to = "module UTX (silk UT)", color = "green" },
+]
+avoid = [
+  { pin = 1, why = "3.3 V rail. The manual allows 3.3-5 V and the vendor debug diagram uses 5 V; about 80 mA typical is a heavy load for pin 1" },
+  { pin = 4, why = "the other 5 V pin; power the module from pin 2 only" },
+  { pin = 8, why = "GPIO14 TXD. A serial console can write rmax, save, or test_mode into URX. Leave URX unconnected" },
+]
+
+[[parts]]
+id = "module"
+name = "HLK-LD1125H-24G"
+detail = "24 GHz presence radar, 2 mm pitch"
+pins = ["VCC", "GND", "URX", "UTX"]
+
+[[parts]]
+id = "seed"
+name = "Seed header"
+detail = "Pi UART or a 3.3 V USB-serial adapter"
+pins = ["2 5V", "6 GND", "10 RXD"]
+
+[[wires]]
+from = "module.VCC"
+to = "seed.2 5V"
+color = "red"
+label = "5 V"
+
+[[wires]]
+from = "module.GND"
+to = "seed.6 GND"
+color = "black"
+label = "GND"
+
+[[wires]]
+from = "module.UTX"
+to = "seed.10 RXD"
+color = "green"
+label = "radar data"
+
+[[flow]]
+name = "Radar"
+detail = "24 GHz FMCW"
+
+[[flow]]
+name = "UART"
+detail = "115200 8N1 ASCII"
+
+[[flow]]
+name = "mov or occ"
+detail = "dis in metres"
+
+[[flow]]
+name = "ld1125h-radar"
+detail = "read only"
+
+[[flow]]
+name = "Outputs"
+detail = "stdout JSON, :8054"
