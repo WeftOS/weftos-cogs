@@ -527,14 +527,25 @@ fn cog_toml_gives_resources_secrets_and_hardware() {
 }
 
 #[test]
-fn cog_toml_interfaces_are_parsed_and_validated() {
+fn cog_toml_interfaces_are_parsed_and_a_bad_list_keeps_the_rest() {
     let ok = parse_cog_toml("[cog]\nid=\"x\"\ninterfaces=[\"uart\",\"gpio\"]\n").unwrap();
     assert_eq!(ok.interfaces, vec!["uart", "gpio"]);
+    assert!(ok.warnings.is_empty());
     assert!(parse_cog_toml("[cog]\nid=\"x\"\n").unwrap().interfaces.is_empty());
-    let e = parse_cog_toml("[cog]\nid=\"x\"\ninterfaces=[\"usb\"]\n").unwrap_err().to_string();
-    assert!(e.contains("unknown interface") && e.contains("audio-in"), "{e}");
-    assert!(parse_cog_toml("[cog]\nid=\"x\"\ninterfaces=[\"none\",\"i2c\"]\n").is_err());
-    assert!(parse_cog_toml("[cog]\nid=\"x\"\ninterfaces=\"i2c\"\n").is_err());
+    for bad in ["[\"usb\"]", "[\"none\",\"i2c\"]", "[\"i2c\",\"i2c\"]", "\"i2c\"", "[1]", "[]"] {
+        let text = format!(
+            "[cog]\nid=\"x\"\nhardware_requirement=[\"v0-appliance\"]\ninterfaces={bad}\n[resources]\nram_mb=64\n[config.k]\nsecret=true\n"
+        );
+        let m = parse_cog_toml(&text).unwrap_or_else(|e| panic!("{bad}: {e}"));
+        assert!(m.interfaces.is_empty(), "{bad}");
+        assert_eq!(m.warnings.len(), 1, "{bad}");
+        assert!(m.warnings[0].contains("interfaces ignored"), "{bad}");
+        assert_eq!(m.ram_mb, Some(64), "{bad}: rest of the metadata is kept");
+        assert_eq!(m.hardware_requirement, vec!["v0-appliance"], "{bad}");
+        assert_eq!(m.secrets, vec!["k"], "{bad}");
+    }
+    let e = parse_cog_toml("[cog]\ninterfaces=[\"usb\"]\n").unwrap().warnings.remove(0);
+    assert!(e.contains("audio-in"), "{e}");
 }
 
 #[test]

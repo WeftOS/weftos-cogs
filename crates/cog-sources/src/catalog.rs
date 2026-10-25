@@ -99,6 +99,8 @@ pub struct CogMeta {
     pub hardware_requirement: Vec<String>,
     /// `[cog].interfaces`, validated; empty when not declared.
     pub interfaces: Vec<String>,
+    /// Problems found while reading `cog.toml` that did not stop the rest being used.
+    pub warnings: Vec<String>,
     /// `[config.*]` keys with `secret = true`.
     pub secrets: Vec<String>,
 }
@@ -113,18 +115,25 @@ pub fn parse_cog_toml(text: &str) -> Result<CogMeta> {
         .and_then(|h| h.as_array())
         .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
         .unwrap_or_default();
+    // A bad interfaces list must not cost the cog the rest of its metadata: drop it, say why.
+    let mut warnings = Vec::new();
     let interfaces: Vec<String> = match v.get("cog").and_then(|c| c.get("interfaces")) {
         None => Vec::new(),
         Some(i) => {
-            let list: Vec<String> = i
+            let list: std::result::Result<Vec<String>, String> = i
                 .as_array()
-                .ok_or_else(|| SourceError::Parse { what: "cog.toml".into(), msg: "interfaces must be a list".into() })?
-                .iter()
-                .map(|x| x.as_str().map(String::from))
-                .collect::<Option<_>>()
-                .ok_or_else(|| SourceError::Parse { what: "cog.toml".into(), msg: "interfaces must be a list of strings".into() })?;
-            cog_repo::validate_interfaces(&list).map_err(|msg| SourceError::Parse { what: "cog.toml".into(), msg })?;
-            list
+                .ok_or_else(|| "interfaces must be a list".to_string())
+                .and_then(|a| {
+                    a.iter()
+                        .map(|x| x.as_str().map(String::from))
+                        .collect::<Option<Vec<String>>>()
+                        .ok_or_else(|| "interfaces must be a list of strings".to_string())
+                })
+                .and_then(|l| cog_repo::validate_interfaces(&l).map(|()| l));
+            list.unwrap_or_else(|msg| {
+                warnings.push(format!("cog.toml: interfaces ignored: {msg}"));
+                Vec::new()
+            })
         }
     };
     let mut secrets: Vec<String> = v
@@ -138,7 +147,7 @@ pub fn parse_cog_toml(text: &str) -> Result<CogMeta> {
         })
         .unwrap_or_default();
     secrets.sort();
-    Ok(CogMeta { ram_mb: num("ram_mb"), cpu_pct: num("cpu_pct"), hardware_requirement, interfaces, secrets })
+    Ok(CogMeta { ram_mb: num("ram_mb"), cpu_pct: num("cpu_pct"), hardware_requirement, interfaces, warnings, secrets })
 }
 
 /// Run mode and its inputs.
@@ -228,6 +237,9 @@ pub struct CatalogRow {
     pub hardware_requirement: Vec<String>,
     /// Declared interfaces (registry, else `cog.toml`).
     pub interfaces: Vec<String>,
+    /// Diagnostics from reading `cog.toml` (for example an invalid `interfaces` list).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
     /// `[resources]` from `cog.toml`, when it was available.
     pub ram_mb: Option<u64>,
     /// `[resources].cpu_pct`.
@@ -335,6 +347,7 @@ pub fn build_rows(
                 arches: c.arches,
                 hardware_requirement: hw,
                 interfaces,
+                warnings: meta.warnings,
                 ram_mb: meta.ram_mb,
                 cpu_pct: meta.cpu_pct,
                 secrets: meta.secrets,
@@ -386,6 +399,9 @@ pub fn render_table(rows: &[CatalogRow]) -> String {
             r.secrets.len(),
             if r.hardware_requirement.is_empty() { "-".into() } else { r.hardware_requirement.join(",") },
         ));
+        for w in &r.warnings {
+            out.push_str(&format!("  warning: {}: {w}\n", r.reference));
+        }
     }
     out
 }
