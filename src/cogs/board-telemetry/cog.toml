@@ -1,0 +1,67 @@
+[cog]
+id = "board-telemetry"
+name = "Board Telemetry"
+version = "0.1.0"
+category = "industrial"
+description = "Reads a Linux board's own health monitors from sysfs and reports one window at a time: input power, voltage and current from an INA2xx hwmon, fan RPM, the hottest thermal zone overall and per group (CPU, GPU, NPU, camera, DDR, other), load average and free memory. Sources are found by name, never by hwmon number. A source that is not there is reported as absent, and a board with none reports no_source."
+binary = "cog-board-telemetry-arm"
+# interfaces = ["none"]  (declared once the WeftOS manifest field lands; this cog opens no bus, only reads /sys and /proc)
+hardware_requirement = ["v0-appliance"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Capture window (--once)"
+description = "Seconds of samples summarized by a single --once run"
+default = 2
+min = 1
+max = 30
+unit = "seconds"
+cli_arg = "--window"
+
+[config.sample_ms]
+type = "integer"
+label = "Sample period"
+description = "Milliseconds between sysfs reads inside a window; means and maxima are taken over them"
+default = 1000
+min = 50
+max = 10000
+unit = "ms"
+cli_arg = "--sample-ms"
+advanced = true
+
+[config.sysfs_root]
+type = "string"
+label = "Filesystem root"
+description = "Directory that holds sys/ and proc/. Leave at / on a board; point it at a copy of a tree to test."
+default = "/"
+cli_arg = "--sysfs-root"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Report synthetic values marked SYNTHETIC instead of reading sysfs. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+[api]
+bind_port = 8062
+bind_loopback_only = true
+
+[console]
+allowed_commands = ["--once", "--once --simulate", "--help"]
+max_runtime_secs = 15
+output_limit_bytes = 65536
