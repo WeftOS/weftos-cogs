@@ -1,0 +1,93 @@
+[cog]
+id = "npu-infer"
+name = "NPU Inference Service"
+version = "0.1.0"
+category = "industrial"
+description = "The node's NPU inference service. Owns GenieX on loopback (one server per resident model, restarted through its wrapper when a model fails to load) and answers service calls on the node's cogbus: a model id, a prompt, optionally one small inline image, and a priority. Calls queue by priority and run one at a time; models stay resident within a memory budget and the least recently used one is evicted to make room; the Stable Diffusion service on the same NPU is waited for. Queue depth, resident models and counters are published as a telemetry reading."
+binary = "cog-npu-infer-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/launcher.rs, src/geniex.rs: npu (starts GenieX, which opens /dev/fastrpc-cdsp; no other bus)
+interfaces = ["npu"]
+
+[config]
+
+[config.service]
+type = "string"
+label = "Service name"
+description = "Source id of the service topic svc.infer/<name> on this node"
+default = "venq-npu"
+cli_arg = "--service"
+
+[config.budget_mib]
+type = "integer"
+label = "Model memory budget"
+description = "Memory the resident models may use together. A model is loaded only if it fits; the least recently used ones are evicted to make room."
+default = 8000
+min = 256
+max = 1000000
+unit = "MiB"
+cli_arg = "--budget-mib"
+
+[config.reserve_mib]
+type = "integer"
+label = "Free memory to keep"
+description = "System MemAvailable that must remain after a model loads (the image service, the daemon and builds need it)"
+default = 2048
+min = 0
+max = 1000000
+unit = "MiB"
+cli_arg = "--reserve-mib"
+advanced = true
+
+[config.slots]
+type = "integer"
+label = "Resident models"
+description = "Most models loaded at once; also the number of loopback ports used from the base port"
+default = 3
+min = 1
+max = 8
+cli_arg = "--slots"
+advanced = true
+
+[config.queue]
+type = "integer"
+label = "Queue length"
+description = "Calls that may wait; more are refused as busy"
+default = 64
+min = 1
+max = 1024
+cli_arg = "--queue"
+advanced = true
+
+[config.sd_url]
+type = "string"
+label = "Image service"
+description = "host:port of the Stable Diffusion service to wait for before using the NPU; none to skip"
+default = "127.0.0.1:18700"
+cli_arg = "--sd-url"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "With --once: run one synthetic call through the scheduler, no GenieX"
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+[[outputs]]
+topic = "svc.infer"
+schema = "infer.v1"
+class = "reading"
+rate = "on demand; one reply per call"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every 5 s"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536
