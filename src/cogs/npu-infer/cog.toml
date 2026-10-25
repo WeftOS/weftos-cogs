@@ -75,6 +75,16 @@ default = false
 cli_arg = "--simulate"
 advanced = true
 
+# Providing the service: svc.infer/<service> (a service topic; WeftOS ADR-122 section 12) and the
+# telemetry reading the node turns into accel.npu facts. A cog that calls this service lists, in
+# its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "svc.infer"
+#   schema = "infer.v1"
+#
+# and calls svc.infer/venq-npu with an infer.v1 body (model, text, priority, ...).
+
 [[outputs]]
 topic = "svc.infer"
 schema = "infer.v1"

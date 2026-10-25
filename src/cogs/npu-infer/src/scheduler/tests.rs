@@ -158,6 +158,40 @@ fn calls_run_highest_priority_first_and_one_at_a_time() {
 }
 
 #[test]
+fn within_a_priority_a_call_for_a_resident_model_runs_before_one_that_needs_a_load() {
+    let log: Log = Default::default();
+    let s = Scheduler::new(32, 20_000);
+    let h = s.run_worker(
+        Box::new(Fake::new(&log)),
+        Box::new(NoGate),
+        Residency::new(20_000, 0, 3),
+    );
+    let (tx, rx) = mpsc::channel();
+    // make gemma3-1b resident first
+    s.submit(job("gemma3-1b", "warmup", 4, &tx)).ok().unwrap();
+    recv(&rx).1.unwrap();
+    // hold the worker with a slow-to-start queue: stop it, queue, restart is not possible,
+    // so queue behind a running job instead
+    let mut slow = job("gemma3-1b", "slow", 4, &tx);
+    let reply = std::mem::replace(&mut slow.reply, Box::new(|_| {}));
+    let (gate_tx, gate_rx) = mpsc::channel::<()>();
+    slow.reply = Box::new(move |r| {
+        reply(r);
+        let _ = gate_rx.recv_timeout(Duration::from_secs(5));
+    });
+    s.submit(slow).ok().unwrap();
+    assert_eq!(recv(&rx).0, "slow");
+    // the worker is now parked in slow's reply; queue a cold job first, then a warm one
+    s.submit(job("qwen3.5-0.8b", "cold", 4, &tx)).ok().unwrap();
+    s.submit(job("gemma3-1b", "warm", 4, &tx)).ok().unwrap();
+    gate_tx.send(()).unwrap();
+    let order: Vec<String> = (0..2).map(|_| recv(&rx).0).collect();
+    assert_eq!(order, ["warm", "cold"]);
+    s.shutdown();
+    h.join().unwrap();
+}
+
+#[test]
 fn a_full_queue_hands_the_call_back_and_counts_it() {
     let s = Scheduler::new(1, 1000);
     let (tx, _rx) = mpsc::channel();

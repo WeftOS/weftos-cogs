@@ -161,7 +161,11 @@ impl Scheduler {
                     if g.shutdown {
                         return;
                     }
-                    if let Some(j) = g.queue.pop(Instant::now()) {
+                    let warm: Vec<String> = g.resident.iter().map(|r| r.alias.clone()).collect();
+                    if let Some(j) = g
+                        .queue
+                        .pop_preferring(Instant::now(), |j| warm.contains(&j.entry.alias))
+                    {
                         g.running = Some(j.entry.alias.clone());
                         break j;
                     }

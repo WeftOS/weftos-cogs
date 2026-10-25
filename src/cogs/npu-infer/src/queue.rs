@@ -61,7 +61,16 @@ impl<T> PriorityQueue<T> {
     }
 
     /// The job that runs next.
+    #[cfg(test)]
     pub fn pop(&mut self, now: Instant) -> Option<T> {
+        self.pop_preferring(now, |_| false)
+    }
+
+    /// The job that runs next. Priority decides first; among jobs of the same
+    /// effective priority, one for which `prefer` is true goes before the
+    /// others (a model that is already resident saves a reload), and arrival
+    /// order breaks the rest.
+    pub fn pop_preferring(&mut self, now: Instant, prefer: impl Fn(&T) -> bool) -> Option<T> {
         let best = self
             .items
             .iter()
@@ -69,6 +78,7 @@ impl<T> PriorityQueue<T> {
             .max_by(|(_, a), (_, b)| {
                 Self::effective(a, now)
                     .cmp(&Self::effective(b, now))
+                    .then(prefer(&a.job).cmp(&prefer(&b.job)))
                     .then(b.seq.cmp(&a.seq))
             })
             .map(|(i, _)| i)?;
@@ -98,6 +108,24 @@ mod tests {
         }
         let order: Vec<_> = std::iter::from_fn(|| q.pop(t0)).collect();
         assert_eq!(order, ["b", "e", "a", "c", "f", "d"]);
+    }
+
+    #[test]
+    fn within_a_priority_the_preferred_job_goes_first_but_never_past_a_higher_one() {
+        let t0 = Instant::now();
+        let mut q = PriorityQueue::new(16);
+        for (p, name) in [(4, "cold1"), (4, "warm"), (4, "cold2"), (9, "urgent-cold")] {
+            q.push(p, name, t0).unwrap();
+        }
+        let warm = |n: &&str| n.starts_with("warm");
+        assert_eq!(q.pop_preferring(t0, warm), Some("urgent-cold"));
+        assert_eq!(
+            q.pop_preferring(t0, warm),
+            Some("warm"),
+            "arrived second, runs first"
+        );
+        assert_eq!(q.pop_preferring(t0, warm), Some("cold1"));
+        assert_eq!(q.pop_preferring(t0, warm), Some("cold2"));
     }
 
     #[test]
