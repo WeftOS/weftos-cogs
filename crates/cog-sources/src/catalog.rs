@@ -97,6 +97,8 @@ pub struct CogMeta {
     pub cpu_pct: Option<u64>,
     /// `[cog].hardware_requirement`.
     pub hardware_requirement: Vec<String>,
+    /// `[cog].interfaces`, validated; empty when not declared.
+    pub interfaces: Vec<String>,
     /// `[config.*]` keys with `secret = true`.
     pub secrets: Vec<String>,
 }
@@ -111,6 +113,20 @@ pub fn parse_cog_toml(text: &str) -> Result<CogMeta> {
         .and_then(|h| h.as_array())
         .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
         .unwrap_or_default();
+    let interfaces: Vec<String> = match v.get("cog").and_then(|c| c.get("interfaces")) {
+        None => Vec::new(),
+        Some(i) => {
+            let list: Vec<String> = i
+                .as_array()
+                .ok_or_else(|| SourceError::Parse { what: "cog.toml".into(), msg: "interfaces must be a list".into() })?
+                .iter()
+                .map(|x| x.as_str().map(String::from))
+                .collect::<Option<_>>()
+                .ok_or_else(|| SourceError::Parse { what: "cog.toml".into(), msg: "interfaces must be a list of strings".into() })?;
+            cog_repo::validate_interfaces(&list).map_err(|msg| SourceError::Parse { what: "cog.toml".into(), msg })?;
+            list
+        }
+    };
     let mut secrets: Vec<String> = v
         .get("config")
         .and_then(|c| c.as_table())
@@ -122,7 +138,7 @@ pub fn parse_cog_toml(text: &str) -> Result<CogMeta> {
         })
         .unwrap_or_default();
     secrets.sort();
-    Ok(CogMeta { ram_mb: num("ram_mb"), cpu_pct: num("cpu_pct"), hardware_requirement, secrets })
+    Ok(CogMeta { ram_mb: num("ram_mb"), cpu_pct: num("cpu_pct"), hardware_requirement, interfaces, secrets })
 }
 
 /// Run mode and its inputs.
@@ -210,6 +226,8 @@ pub struct CatalogRow {
     pub arches: Vec<String>,
     /// Hardware requirement (registry, else `cog.toml`).
     pub hardware_requirement: Vec<String>,
+    /// Declared interfaces (registry, else `cog.toml`).
+    pub interfaces: Vec<String>,
     /// `[resources]` from `cog.toml`, when it was available.
     pub ram_mb: Option<u64>,
     /// `[resources].cpu_pct`.
@@ -291,6 +309,7 @@ pub fn build_rows(
                 .and_then(|t| parse_cog_toml(&t).ok())
                 .unwrap_or_default();
             let hw = if c.hardware_requirement.is_empty() { meta.hardware_requirement.clone() } else { c.hardware_requirement.clone() };
+            let interfaces = if c.interfaces.is_empty() { meta.interfaces.clone() } else { c.interfaces.clone() };
             let run = RunInfo::from_expect(expectations.and_then(|e| e.cogs.get(&c.id)));
             let policy = policy_for(&c.arches, &hw, &meta, &run);
             let access = if c.signed {
@@ -315,6 +334,7 @@ pub fn build_rows(
                 description: c.description,
                 arches: c.arches,
                 hardware_requirement: hw,
+                interfaces,
                 ram_mb: meta.ram_mb,
                 cpu_pct: meta.cpu_pct,
                 secrets: meta.secrets,

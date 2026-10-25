@@ -6,6 +6,8 @@ category = "developer"
 description = "Serves the WeftOS hardware-catalog browse page (Projects -> Modules -> Chips) and the catalog JSON over HTTP, so the appliance offers the catalog on the mesh. Embeds crates/cog-market/catalog/catalog.json and a self-contained viewer; no sensor, no store writes."
 binary = "cog-catalog-arm"
 hardware_requirement = ["v0-appliance"]
+# interfaces: src/main.rs: serve (TcpListener only); no device opened
+interfaces = ["none"]
 
 [api]
 bind_port = 8060

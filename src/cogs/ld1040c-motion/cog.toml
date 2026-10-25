@@ -6,6 +6,8 @@ category = "presence"
 description = "Hi-Link HLK-LD1040C 10.525 GHz X-band Doppler motion radar on a Cognitum Seed. Senses MOVING targets (micro-motion) within ~3-4 m over a 110 degrees ceiling-mount beam; it does not detect static presence and does not see through walls. The reliable signal is the OUT digital line (HIGH on motion, with the module's 5 s output hold and 2 s re-trigger block), read over a Pi GPIO input. Per window it reports whether motion is currently held, the rising-edge count, the fraction of the window OUT was high, and the seconds since the last motion. The first ~9 s after power-on are a warm-up and are flagged. An optional UART telemetry frame (off by default) best-effort adds the motion amplitude, signal and noise; a field that is not parsed is reported null, never fabricated. A missing OUT line yields a no_source line with null values."
 binary = "cog-ld1040c-motion-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/uart.rs: configure (termios2 on --uart) and src/source.rs: GpioLine::open (/dev/gpiochip0 OUT line)
+interfaces = ["uart", "gpio"]
 
 [config]
 

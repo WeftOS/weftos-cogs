@@ -44,6 +44,7 @@ pub fn signed_repo(dir: &Path, signer: &SigningKey, cogs: &[&str]) -> PathBuf {
             category: "health".into(),
             description: format!("{id} cog"),
             hardware_requirement: vec!["pi-zero-2w".into()],
+            interfaces: vec![],
             artifacts: BTreeMap::from([(
                 "arm".to_string(),
                 Artifact {

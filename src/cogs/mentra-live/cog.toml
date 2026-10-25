@@ -6,6 +6,8 @@ category = "wearable"
 description = "Companion-side bridge that lets a pair of Mentra Live smart glasses join the mesh as a node. The glasses run Android (the MentraOS ASG client) and cannot run a cog themselves, so this cog runs on a companion that can reach them over ADB (USB, or ADB-over-TCP/Wi-Fi) and reports their liveness. Each interval it reads presence (device reachable), battery (level, charging state, plug type, pack temperature and voltage) and link health (ADB round-trip time), emits them as a store vector, and posts a fleet heartbeat so the glasses show up as an online node. Telemetry-first by design; HUD rendering, sensors and audio are built on top of this node once it is joined. Fail-honest: with no ADB or no device it reports no_source and keeps the node offline rather than faking liveness."
 binary = "cog-mentra-live-arm64"
 hardware_requirement = ["v0-appliance"]
+# interfaces: src/adb.rs and src/heartbeat.rs: ADB and heartbeat over TCP only; no local device
+interfaces = ["none"]
 
 [config]
 

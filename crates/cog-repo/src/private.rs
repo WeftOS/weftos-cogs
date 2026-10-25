@@ -247,6 +247,7 @@ struct Meta {
     category: Option<String>,
     description: Option<String>,
     hardware: Vec<String>,
+    interfaces: Vec<String>,
 }
 
 fn meta_from_cog_toml(path: &str) -> R<Meta> {
@@ -265,6 +266,14 @@ fn meta_from_cog_toml(path: &str) -> R<Meta> {
                 .collect()
         })
         .unwrap_or_default();
+    let interfaces: Vec<String> = c
+        .get("interfaces")
+        .and_then(|h| h.as_array())
+        .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+    if c.get("interfaces").is_some() {
+        cog_repo::validate_interfaces(&interfaces).map_err(|e| format!("{path}: {e}"))?;
+    }
     Ok(Meta {
         id: s("id"),
         name: s("name"),
@@ -272,6 +281,7 @@ fn meta_from_cog_toml(path: &str) -> R<Meta> {
         category: s("category"),
         description: s("description"),
         hardware,
+        interfaces,
     })
 }
 
@@ -298,6 +308,7 @@ pub fn cmd_add(args: &[String]) -> R<()> {
             category: None,
             description: None,
             hardware: vec![],
+            interfaces: vec![],
         },
     };
     if let Some(v) = arg(args, "--id") {
@@ -354,6 +365,7 @@ pub fn cmd_add(args: &[String]) -> R<()> {
             "category": pick("--category", &meta.category, ""),
             "description": pick("--description", &meta.description, ""),
             "hardware_requirement": hardware,
+            "interfaces": meta.interfaces,
         });
         std::fs::write(
             &manifest_path,

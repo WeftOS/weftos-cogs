@@ -527,6 +527,17 @@ fn cog_toml_gives_resources_secrets_and_hardware() {
 }
 
 #[test]
+fn cog_toml_interfaces_are_parsed_and_validated() {
+    let ok = parse_cog_toml("[cog]\nid=\"x\"\ninterfaces=[\"uart\",\"gpio\"]\n").unwrap();
+    assert_eq!(ok.interfaces, vec!["uart", "gpio"]);
+    assert!(parse_cog_toml("[cog]\nid=\"x\"\n").unwrap().interfaces.is_empty());
+    let e = parse_cog_toml("[cog]\nid=\"x\"\ninterfaces=[\"usb\"]\n").unwrap_err().to_string();
+    assert!(e.contains("unknown interface") && e.contains("audio-in"), "{e}");
+    assert!(parse_cog_toml("[cog]\nid=\"x\"\ninterfaces=[\"none\",\"i2c\"]\n").is_err());
+    assert!(parse_cog_toml("[cog]\nid=\"x\"\ninterfaces=\"i2c\"\n").is_err());
+}
+
+#[test]
 fn catalog_lists_cogs_across_sources_with_run_mode_policy_and_access() {
     let tmp = tempfile::tempdir().unwrap();
     let k = key(13);

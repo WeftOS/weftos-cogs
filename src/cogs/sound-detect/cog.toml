@@ -6,6 +6,8 @@ category = "presence"
 description = "Detects sound/noise with a KY-038 / LM393 microphone comparator module read through an ADS1115 I2C ADC on the Seed's GPIO header (OUT on A1, so it coexists with the sen0213-ecg cog on A0). Reports whether sound is present, the per-minute event rate, the quiet time since the last event, the activity percentage, level and peak. Tune the module's trimpot (or --threshold) for your room. Works for the common active-high digital OUT and, degraded, for analog-OUT variants."
 binary = "cog-sound-detect-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/adc.rs: Ads1115::open (/dev/i2c-N, ioctl I2C_SLAVE)
+interfaces = ["i2c"]
 
 [config]
 

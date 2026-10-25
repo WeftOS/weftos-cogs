@@ -6,6 +6,8 @@ category = "presence"
 description = "Reads an HLK-LD2450 24 GHz multi-target tracking radar over a 3.3 V UART (256000 8N1) and reports, per window, the up-to-three targets of the radar's latest frame: x/y in metres in the radar's own frame (not room coordinates), speed in m/s and the distance-gate size, plus the valid-target count, frame rate and parse-error counts. Positions only: no identity, no pose, no bounding box. A missing or silent radar yields null values, never a fabricated reading."
 binary = "cog-ld2450-radar-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/main.rs: open_uart (serialport on --device, /dev/serial0)
+interfaces = ["uart"]
 
 [config]
 

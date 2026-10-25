@@ -134,6 +134,11 @@ fn meta_from_manifest(manifest: &serde_json::Value, id: &str) -> CogEntry {
         category: s("category"),
         description: s("description"),
         hardware_requirement: hw,
+        interfaces: manifest
+            .get("interfaces")
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+            .unwrap_or_default(),
         artifacts: BTreeMap::new(),
     }
 }
@@ -771,6 +776,7 @@ mod tests {
                 category: String::new(),
                 description: String::new(),
                 hardware_requirement: vec![],
+                interfaces: vec![],
                 artifacts,
             }],
         }

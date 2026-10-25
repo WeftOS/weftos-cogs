@@ -37,6 +37,8 @@ pub struct SourceCog {
     pub description: String,
     /// `hardware_requirement` when the registry carries it (WeftOS / private only).
     pub hardware_requirement: Vec<String>,
+    /// `interfaces` when the registry carries it.
+    pub interfaces: Vec<String>,
     /// Arches with a binary: `arm`, `arm64`.
     pub arches: Vec<String>,
     /// Binary size in KiB.
@@ -68,6 +70,7 @@ impl LoadedSource {
                     category: c.category.clone(),
                     description: c.description.clone(),
                     hardware_requirement: c.hardware_requirement.clone(),
+                    interfaces: c.interfaces.clone(),
                     arches: c.artifacts.keys().cloned().collect(),
                     size_kb: c.artifacts.get("arm").or_else(|| c.artifacts.values().next()).map(|a| a.size / 1024),
                     signed: true,
@@ -83,6 +86,7 @@ impl LoadedSource {
                     category: c.category.clone(),
                     description: c.description.clone(),
                     hardware_requirement: vec![],
+                    interfaces: vec![],
                     arches: vec!["arm".into()],
                     size_kb: c.size_kb,
                     signed: false,

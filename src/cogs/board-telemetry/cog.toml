@@ -5,8 +5,9 @@ version = "0.1.0"
 category = "industrial"
 description = "Reads a Linux board's own health monitors from sysfs and reports one window at a time: input power, voltage and current from an INA2xx hwmon, fan RPM, the hottest thermal zone overall and per group (CPU, GPU, NPU, camera, DDR, other), load average and free memory. Sources are found by name, never by hwmon number. A source that is not there is reported as absent, and a board with none reports no_source."
 binary = "cog-board-telemetry-arm"
-# interfaces = ["none"]  (declared once the WeftOS manifest field lands; this cog opens no bus, only reads /sys and /proc)
 hardware_requirement = ["v0-appliance"]
+# interfaces: src/sources.rs: read (reads /sys/class/hwmon, /sys/class/thermal, /proc only; no bus opened)
+interfaces = ["none"]
 
 [config]
 

@@ -37,6 +37,12 @@ KNOWN_CATEGORIES = {
     "industrial", "developer", "signal", "presence", "network",
     "wearable",  # ours, not upstream: body-worn devices with their own sensors (COG-008, Categories)
 }
+# [cog].interfaces: what the cog's native half opens. Same names and rules as the WeftOS
+# kernel parser (clawft-kernel workload_runtime/cog_decl.rs); "none" must stand alone.
+KNOWN_INTERFACES = [
+    "i2c", "spi", "uart", "gpio", "can", "mcu", "camera",
+    "audio-in", "audio-out", "video-encode", "sdr", "npu",
+]
 BUILTIN_FLAGS = {"--once", "--interval", "--help"}
 ADR001_PROFILE = {  # key -> accepted values
     "opt-level": {"s"},
@@ -181,6 +187,25 @@ def rust_sources(cog_dir: Path) -> str:
     return "\n".join(parts)
 
 
+def interface_problems(value) -> list[str]:
+    """Problems with a [cog].interfaces value; empty means valid."""
+    if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+        return ["interfaces must be a list of strings"]
+    if not value:
+        return ["interfaces is empty; use [\"none\"] for a cog that opens nothing"]
+    out = []
+    allowed = ", ".join(KNOWN_INTERFACES + ["none"])
+    for name in value:
+        if name != "none" and name not in KNOWN_INTERFACES:
+            out.append(f"unknown interface {name!r} (allowed: {allowed})")
+    dupes = sorted({n for n in value if value.count(n) > 1})
+    if dupes:
+        out.append(f"interfaces repeats {dupes}")
+    if "none" in value and len(value) > 1:
+        out.append('"none" must stand alone in interfaces')
+    return out
+
+
 def lint_cog(root: Path, cog_dir: Path, strict_portable: bool, stats: dict) -> list[Finding]:
     cog = cog_dir.name
     def rel(p: Path) -> str:
@@ -229,6 +254,15 @@ def lint_cog(root: Path, cog_dir: Path, strict_portable: bool, stats: dict) -> l
             bad = [d for d in hw if d not in KNOWN_HARDWARE]
             if bad:
                 add("L004", "error", cog_path, hw_line, f"unknown device(s) {bad}; allowed {sorted(KNOWN_HARDWARE)}")
+
+        # L015 interfaces (optional for the parser, expected on every cog here)
+        ifc = meta.get("interfaces")
+        ifc_line = toml_line(cog_text, "[cog]", "interfaces")
+        if ifc is None:
+            add("L015", "warning", cog_path, 1, "interfaces missing; name what the cog opens, or [\"none\"]")
+        else:
+            for msg in interface_problems(ifc):
+                add("L015", "error", cog_path, ifc_line, msg)
 
         # L005 category
         cat = meta.get("category")

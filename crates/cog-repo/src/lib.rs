@@ -43,8 +43,41 @@ pub struct CogEntry {
     pub description: String,
     #[serde(default)]
     pub hardware_requirement: Vec<String>,
+    /// `[cog].interfaces`: what the native half opens (see [`KNOWN_INTERFACES`]). Empty when the
+    /// cog does not declare any; not serialized then, so older registries keep their bytes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub interfaces: Vec<String>,
     /// Registry key (`arm`, `arm64`, or `x86_64`) -> artifact. See [`COG_ARCHES`].
     pub artifacts: BTreeMap<String, Artifact>,
+}
+
+/// Interface names a cog may declare in `[cog].interfaces`. Same set as the WeftOS kernel parser
+/// (`workload_runtime/cog_decl.rs`) and `scripts/cog_lint.py`; `none` is allowed too, alone.
+pub const KNOWN_INTERFACES: &[&str] = &[
+    "i2c", "spi", "uart", "gpio", "can", "mcu", "camera", "audio-in", "audio-out", "video-encode",
+    "sdr", "npu",
+];
+
+/// Checks a `[cog].interfaces` list: known names only, no repeats, `none` alone, not empty.
+pub fn validate_interfaces(list: &[String]) -> Result<(), String> {
+    if list.is_empty() {
+        return Err("interfaces is empty; use [\"none\"] for a cog that opens nothing".into());
+    }
+    for (i, name) in list.iter().enumerate() {
+        if name != "none" && !KNOWN_INTERFACES.contains(&name.as_str()) {
+            return Err(format!(
+                "unknown interface {name:?} (allowed: {}, none)",
+                KNOWN_INTERFACES.join(", ")
+            ));
+        }
+        if list[..i].contains(name) {
+            return Err(format!("interfaces repeats {name:?}"));
+        }
+    }
+    if list.len() > 1 && list.iter().any(|n| n == "none") {
+        return Err("\"none\" must stand alone in interfaces".into());
+    }
+    Ok(())
 }
 
 /// Dist filename suffix for each COG-008 registry key.
@@ -191,6 +224,29 @@ pub fn verify_artifact_unrevoked(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn interfaces_validate_like_the_kernel_parser() {
+        let v = |xs: &[&str]| validate_interfaces(&xs.iter().map(|x| x.to_string()).collect::<Vec<_>>());
+        assert!(v(&["i2c"]).is_ok());
+        assert!(v(&["uart", "gpio"]).is_ok());
+        assert!(v(&["none"]).is_ok());
+        let e = v(&["usb"]).unwrap_err();
+        assert!(e.contains("unknown interface") && e.contains("audio-in") && e.contains("none"), "{e}");
+        assert!(v(&["i2c", "i2c"]).unwrap_err().contains("repeats"));
+        assert!(v(&["none", "i2c"]).unwrap_err().contains("stand alone"));
+        assert!(v(&[]).is_err());
+    }
+
+    #[test]
+    fn empty_interfaces_are_not_serialized() {
+        let e: CogEntry = serde_json::from_str(
+            r#"{"id":"a","name":"a","version":"1","artifacts":{}}"#,
+        )
+        .unwrap();
+        assert!(e.interfaces.is_empty());
+        assert!(!serde_json::to_string(&e).unwrap().contains("interfaces"));
+    }
+
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
 
@@ -299,6 +355,7 @@ mod tests {
                 category: "network".into(),
                 description: "d".into(),
                 hardware_requirement: vec!["pi-zero-2w".into(), "v0-appliance".into()],
+                interfaces: vec!["none".into()],
                 artifacts: BTreeMap::from([("arm".into(), artifact_for(&sk, b"x"))]),
             }],
         };

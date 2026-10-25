@@ -6,6 +6,8 @@ category = "presence"
 description = "Hi-Link HLK-AS201 9/10-axis attitude sensor (3-axis accel + 3-axis gyro + 3-axis magnetometer + barometer; 32-bit DSP) read over a 3.3 V TTL UART at 115200 8N1. Reports orientation (roll/pitch/yaw), acceleration (g), angular rate (deg/s), magnetic field (uT), quaternion, temperature, pressure and height. Protocol CONFIRMED against the Hi-Link AS201 datasheet V1.1 (2025-08-01): FA FB.len.cmd.data.SUM.FC FD framing, cmd 0x00 report with a 42-byte ten-axis payload. The X/Y/Z silkscreen identifies this as an IMU, not a radar."
 binary = "cog-hlk-as201-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/serial.rs: Serial::open (termios2 on the tty port)
+interfaces = ["uart"]
 
 [config]
 

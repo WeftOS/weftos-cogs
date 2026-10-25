@@ -6,6 +6,8 @@ category = "signal"
 description = "Reads a Bosch BME280 (catalog id bme280) over I2C at 0x76 or 0x77. Reports temperature, relative humidity, and barometric pressure from one forced sample. Chip id 0xD0 must be 0x60. A BMP280 or BME680 is refused."
 binary = "cog-bme280-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/bus.rs: read_once (/dev/i2c-N, ioctl I2C_SLAVE)
+interfaces = ["i2c"]
 
 [config]
 

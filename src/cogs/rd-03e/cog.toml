@@ -6,6 +6,8 @@ category = "presence"
 description = "Ai-Thinker RD-03E 24 GHz FMCW presence + ranging radar (S3KM111L SoC) read over a 3.3 V TTL UART at 256000 8N1. The module streams a 5-byte report frame (AA·dist_lo·dist_hi·state·55) on power-up with no configuration needed. Reports whether a target is present, its distance in cm (±5 cm from 30-350 cm, to ~6 m), the per-minute detection rate and the quiet time since the last detection. Frame layout confirmed by community captures; gesture-code meanings (state 2-8) are vendor-specific and reported raw."
 binary = "cog-rd-03e-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/serial.rs: Serial::open (termios2 on the tty port)
+interfaces = ["uart"]
 
 [config]
 

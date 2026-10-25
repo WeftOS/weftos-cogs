@@ -6,6 +6,8 @@ category = "presence"
 description = "Reads a DFRobot SEN0628 8x8 matrix time-of-flight sensor (VL53L7CX + RP2040, 20-3500 mm, 60 deg FOV) over I2C on the Seed's GPIO header. Reports the nearest object and its zone, the valid-zone share, frame-to-frame motion, presence against a learned background, left/middle/right sector distances and per-zone noise, and exports raw depth frames."
 binary = "cog-sen0628-tof-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/tof.rs: Sen0628::open (/dev/i2c-N, ioctl I2C_SLAVE)
+interfaces = ["i2c"]
 
 [config]
 
