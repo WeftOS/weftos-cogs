@@ -19,7 +19,7 @@ The kernel already publishes all of this through hwmon and thermal sysfs. hwmon 
    - `/proc/loadavg` (first field) and `/proc/meminfo` `MemAvailable`.
 2. **`--sysfs-root PATH`** replaces `/` as the directory holding `sys/` and `proc/`. Tests run against fixture trees in `tests/fixtures/` (`ventuno`, `pi`, `empty`).
 3. **Window.** Samples are taken `--sample-ms` apart (default 1000) for `--interval` seconds, or `--window` seconds with `--once` (default 2). Power, voltage, current, fan speed and load are the window mean. Temperatures are the window maximum, overall and per group.
-4. **Ingest vector, id 28** (after 21 to 27 used by the other sensor cogs), posted to `127.0.0.1:80/api/v1/store/ingest` with `dedup: true` as the other cogs do. Eight floats in physical units:
+4. **Ingest vector, id 28** (after 21 to 27 used by the other sensor cogs), posted with `dedup: true` as the other cogs do, to `$COGNITUM_INGEST_URL` when the node sets it (the bridge may be on a loopback fallback port; the URL must be `http://` on a loopback host, otherwise it is ignored with a warning) and to `127.0.0.1:80/api/v1/store/ingest` when it is not. `$COGNITUM_COG_TOKEN` is sent as a bearer token when present (`src/ingest.rs`). Eight floats in physical units:
 
    | Slot | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
    |---|---|---|---|---|---|---|---|---|

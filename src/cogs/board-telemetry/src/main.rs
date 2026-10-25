@@ -14,12 +14,12 @@
 
 mod export;
 mod guide;
+mod ingest;
 mod sources;
 mod window;
 
 use export::{round, Shared, State};
 use sources::{Group, Snapshot};
-use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -28,7 +28,7 @@ use window::{Window, SLOTS};
 const TAG: &str = "[cog-board-telemetry]";
 /// Per-cog id in the store vector tuple (21=ecg, 22=tof, 23=sound, 24=rd-03e, 25=as201,
 /// 26=mentra, 27=ld1040c, 28=board-telemetry).
-const STORE_ID: u32 = 28;
+pub(crate) const STORE_ID: u32 = 28;
 
 struct Opts {
     once: bool,
@@ -170,49 +170,6 @@ fn build_report(
     (report, vector)
 }
 
-fn store_to_seed(vector: &[f64]) -> Result<(), String> {
-    let payload = serde_json::json!({ "vectors": [[STORE_ID, vector]], "dedup": true });
-    let body = serde_json::to_vec(&payload).map_err(|e| format!("json: {e}"))?;
-    let mut conn =
-        std::net::TcpStream::connect("127.0.0.1:80").map_err(|e| format!("connect: {e}"))?;
-    conn.set_read_timeout(Some(Duration::from_secs(5))).ok();
-    conn.set_write_timeout(Some(Duration::from_secs(5))).ok();
-    write!(conn, "POST /api/v1/store/ingest HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n", body.len()).map_err(|e| format!("write: {e}"))?;
-    conn.write_all(&body).map_err(|e| format!("body: {e}"))?;
-    // The agent answers HTTP/1.1 and keeps the socket open; stop at Content-Length, not EOF.
-    let mut resp = Vec::new();
-    let mut buf = [0u8; 1024];
-    while !response_complete(&resp) {
-        match conn.read(&mut buf) {
-            Ok(0) | Err(_) => break,
-            Ok(n) => resp.extend_from_slice(&buf[..n]),
-        }
-    }
-    let status = String::from_utf8_lossy(&resp)
-        .split_whitespace()
-        .nth(1)
-        .unwrap_or("")
-        .to_string();
-    if status.starts_with('2') {
-        Ok(())
-    } else {
-        Err(format!("ingest replied {status:?}"))
-    }
-}
-
-fn response_complete(resp: &[u8]) -> bool {
-    let Some(end) = resp.windows(4).position(|w| w == b"\r\n\r\n") else {
-        return false;
-    };
-    let head = String::from_utf8_lossy(&resp[..end]).to_ascii_lowercase();
-    let len = head
-        .lines()
-        .find_map(|l| l.strip_prefix("content-length:"))
-        .and_then(|v| v.trim().parse::<usize>().ok())
-        .unwrap_or(0);
-    resp.len() >= end + 4 + len
-}
-
 /// Takes the samples of one window, `sample_ms` apart (no wait after the last one when the
 /// process exits right after reporting).
 fn collect(o: &Opts, period_s: u64, tick: &mut u64, last_wait: bool) -> Vec<Snapshot> {
@@ -269,6 +226,12 @@ fn main() {
         format!("sysfs:{}", o.root.display())
     };
 
+    let (ingest_target, ingest_warning) =
+        ingest::target_from_env(std::env::var(ingest::ENV_URL).ok().as_deref());
+    if let Some(w) = ingest_warning {
+        eprintln!("{TAG} {w}");
+    }
+    let token = std::env::var(ingest::ENV_TOKEN).ok();
     let period = if o.once { o.window } else { o.interval };
     let mut tick = 0u64;
     loop {
@@ -282,7 +245,7 @@ fn main() {
         }
         // Synthetic values never go into the real store; a board with no source has no vector.
         if report["status"] == "ok" {
-            if let Err(e) = store_to_seed(&vector) {
+            if let Err(e) = ingest::store_to_seed(&ingest_target, token.as_deref(), &vector) {
                 eprintln!("{TAG} store error: {e}");
             }
         } else if report["status"] == "no_source" {
@@ -397,15 +360,5 @@ mod tests {
         assert_eq!(r["status"], "simulate");
         assert_eq!(r["provenance"], "SYNTHETIC");
         assert!(v.iter().all(|x| *x >= 0.0));
-    }
-
-    #[test]
-    fn response_complete_stops_at_content_length() {
-        assert!(!response_complete(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n"
-        ));
-        assert!(response_complete(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}"
-        ));
     }
 }

@@ -25,7 +25,7 @@ cog-board-telemetry --once --sysfs-root DIR  # DIR must hold sys/ and proc/
 | Output | Where |
 |---|---|
 | JSON report per window | stdout |
-| 8-float vector, id 28 | `POST 127.0.0.1:80/api/v1/store/ingest`, only when `status` is `ok` |
+| 8-float vector, id 28 | `POST` to `$COGNITUM_INGEST_URL` when the node sets it (loopback `http://` only, else ignored with a warning), otherwise `127.0.0.1:80/api/v1/store/ingest`; only when `status` is `ok`. `$COGNITUM_COG_TOKEN`, if set, is sent as a bearer token |
 | Export | `http://127.0.0.1:8062` (`/status`, `/history`, `/guide`, `/healthz`), continuous mode only |
 
 `--simulate` never posts to the store.
