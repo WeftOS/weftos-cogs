@@ -10,7 +10,24 @@ pub struct Request {
     pub text: Option<String>,
     /// `(mime, base64)`.
     pub image: Option<(String, String)>,
+    /// An image held by the broker as a blob (ADR-122 section 13). The worker
+    /// fetches it just before the call runs and turns it into `image`.
+    pub image_blob: Option<BlobRef>,
     pub max_tokens: u32,
+}
+
+/// A `blob.v1` handle's essentials.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlobRef {
+    pub hash: String,
+    pub size: u64,
+    pub media_type: String,
+}
+
+/// Where blob bytes come from (the broker).
+pub trait BlobSource: Send {
+    /// The bytes of `b`, `Err` with the reason when they cannot be read.
+    fn fetch(&self, b: &BlobRef) -> Result<Vec<u8>, String>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

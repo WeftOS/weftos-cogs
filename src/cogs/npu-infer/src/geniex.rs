@@ -198,6 +198,7 @@ impl Backend for GeniexBackend {
             system: None,
             text: Some("hi".into()),
             image: None,
+            image_blob: None,
             max_tokens: 1,
         };
         if let Err(err) = self.chat(port, e, &chat_body(e, &warm)) {
@@ -406,6 +407,7 @@ mod tests {
                     system: Some("s".into()),
                     text: Some("q".into()),
                     image: None,
+                    image_blob: None,
                     max_tokens: 8,
                 },
             )
@@ -431,6 +433,7 @@ mod tests {
                     system: None,
                     text: Some("q".into()),
                     image: None,
+                    image_blob: None,
                     max_tokens: 1
                 }
             ),
@@ -479,6 +482,7 @@ mod tests {
                 system: None,
                 text: Some("what?".into()),
                 image: Some(("image/png".into(), "AAAA".into())),
+                image_blob: None,
                 max_tokens: 4,
             },
         );
@@ -502,6 +506,7 @@ mod tests {
                     system: None,
                     text: Some("q".into()),
                     image: None,
+                    image_blob: None,
                     max_tokens: 1,
                 },
             )

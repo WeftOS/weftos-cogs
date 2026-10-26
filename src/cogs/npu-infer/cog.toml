@@ -73,6 +73,27 @@ max = 1024
 cli_arg = "--queue"
 advanced = true
 
+[config.publish_secs]
+type = "integer"
+label = "Telemetry period"
+description = "Seconds between telemetry readings"
+default = 5
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--publish-secs"
+advanced = true
+
+[config.base_port]
+type = "integer"
+label = "First GenieX port"
+description = "Loopback port of the first GenieX server; one more port per resident model"
+default = 18181
+min = 1024
+max = 65000
+cli_arg = "--base-port"
+advanced = true
+
 [config.sd_url]
 type = "string"
 label = "Image service"

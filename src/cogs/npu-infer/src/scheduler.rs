@@ -12,7 +12,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-use crate::backend::{Backend, Gate, Output, Request};
+use crate::b64;
+use crate::backend::{Backend, BlobSource, Gate, Output, Request};
 use crate::catalog::Entry;
 use crate::queue::PriorityQueue;
 use crate::residency::{Plan, Residency};
@@ -147,13 +148,20 @@ impl Scheduler {
         &self,
         backend: Box<dyn Backend>,
         gate: Box<dyn Gate>,
+        blobs: Box<dyn BlobSource>,
         residency: Residency,
     ) -> JoinHandle<()> {
         let s = self.clone();
-        std::thread::spawn(move || s.work(backend, gate, residency))
+        std::thread::spawn(move || s.work(backend, gate, blobs, residency))
     }
 
-    fn work(&self, mut backend: Box<dyn Backend>, gate: Box<dyn Gate>, mut res: Residency) {
+    fn work(
+        &self,
+        mut backend: Box<dyn Backend>,
+        gate: Box<dyn Gate>,
+        blobs: Box<dyn BlobSource>,
+        mut res: Residency,
+    ) {
         loop {
             let job = {
                 let mut g = self.lock();
@@ -172,7 +180,13 @@ impl Scheduler {
                     g = self.shared.cv.wait(g).unwrap_or_else(|p| p.into_inner());
                 }
             };
-            let outcome = self.run(job, backend.as_mut(), gate.as_ref(), &mut res);
+            let outcome = self.run(
+                job,
+                backend.as_mut(),
+                gate.as_ref(),
+                blobs.as_ref(),
+                &mut res,
+            );
             let mut g = self.lock();
             g.running = None;
             match outcome {
@@ -259,10 +273,17 @@ impl Scheduler {
         }
     }
 
-    fn run(&self, job: Job, be: &mut dyn Backend, gate: &dyn Gate, res: &mut Residency) -> Outcome {
+    fn run(
+        &self,
+        job: Job,
+        be: &mut dyn Backend,
+        gate: &dyn Gate,
+        blobs: &dyn BlobSource,
+        res: &mut Residency,
+    ) -> Outcome {
         let Job {
             entry,
-            req,
+            mut req,
             enq,
             deadline,
             reply,
@@ -274,6 +295,21 @@ impl Scheduler {
             return Outcome::Expired;
         }
         let queue_ms = ms(started - enq);
+        // An image held by the broker is read now, not when queued: a queue of
+        // waiting calls holds handles, not megabytes. A blob that cannot be
+        // read fails the call before any model is loaded for it.
+        if let Some(b) = req.image_blob.take() {
+            match blobs.fetch(&b) {
+                Ok(bytes) => req.image = Some((b.media_type, b64::encode(&bytes))),
+                Err(m) => {
+                    reply(Err(format!(
+                        "image blob {}: {m}",
+                        &b.hash[..12.min(b.hash.len())]
+                    )));
+                    return Outcome::Failed;
+                }
+            }
+        }
         let mut loaded = match self.ensure(&entry, be, res) {
             Ok(l) => l,
             Err(m) => {

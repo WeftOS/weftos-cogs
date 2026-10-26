@@ -80,6 +80,75 @@ default = false
 cli_arg = "--simulate"
 advanced = true
 
+[config.service]
+type = "string"
+label = "Service name"
+description = "Calls svc.infer/<name>"
+default = "venq-npu"
+cli_arg = "--service"
+advanced = true
+
+[config.max_tokens]
+type = "integer"
+label = "Tokens per call"
+description = "Most tokens each call may generate"
+default = 24
+min = 1
+max = 4096
+cli_arg = "--max-tokens"
+advanced = true
+
+[config.timeout_secs]
+type = "integer"
+label = "Call deadline"
+description = "Seconds each call may take, queueing included"
+default = 180
+min = 1
+max = 600
+unit = "seconds"
+cli_arg = "--timeout-secs"
+advanced = true
+
+[config.calls]
+type = "integer"
+label = "Calls"
+description = "Stop after this many calls; 0 for no limit"
+default = 0
+min = 0
+max = 1000000000
+cli_arg = "--calls"
+advanced = true
+
+[config.text]
+type = "string"
+label = "Prompt"
+description = "The prompt; {n} is replaced by the call number"
+default = "In five words, say something about the number {n}."
+cli_arg = "--text"
+advanced = true
+
+[config.watch_every]
+type = "integer"
+label = "Telemetry log period"
+description = "Seconds between logged telemetry lines (with watch)"
+default = 10
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--watch-every"
+advanced = true
+
+[config.summary_secs]
+type = "integer"
+label = "Summary period"
+description = "Seconds between summary lines"
+default = 60
+min = 1
+max = 86400
+unit = "seconds"
+cli_arg = "--summary-secs"
+advanced = true
+
 # Calls the NPU service (svc.infer, infer.v1) and optionally reads its telemetry.
 [[inputs]]
 topic = "svc.infer"

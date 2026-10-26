@@ -16,6 +16,7 @@
 //!   cog-npu-infer --once --simulate       # one synthetic call through the scheduler, exit
 //!   cog-npu-infer --help
 
+mod b64;
 mod backend;
 mod bus;
 mod catalog;
@@ -33,12 +34,12 @@ mod telemetry;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
-use backend::{Backend, Gate};
+use backend::{Backend, BlobRef, BlobSource, Gate};
 use catalog::Catalog;
 use residency::Residency;
 use scheduler::Scheduler;
@@ -170,12 +171,37 @@ fn gate(o: &Opts) -> Box<dyn Gate> {
     }
 }
 
+/// The broker connection the worker reads blobs through; empty between connections.
+struct LiveBus(Arc<Mutex<Option<Arc<bus::Bus>>>>);
+
+impl BlobSource for LiveBus {
+    fn fetch(&self, b: &BlobRef) -> Result<Vec<u8>, String> {
+        let bus = self
+            .0
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+            .ok_or("no broker connection")?;
+        bus.blob_get(&b.hash, b.size)
+    }
+}
+
+/// `--once --simulate` has no broker.
+struct NoBlobs;
+
+impl BlobSource for NoBlobs {
+    fn fetch(&self, _: &BlobRef) -> Result<Vec<u8>, String> {
+        Err("no broker in this run".into())
+    }
+}
+
 fn run_once_simulated(o: &Opts) -> i32 {
     let catalog = Catalog::ventuno();
     let sched = Scheduler::new(o.queue, o.budget_mib);
     let h = sched.run_worker(
         Box::new(sim::Sim),
         Box::new(sd::NoGate),
+        Box::new(NoBlobs),
         Residency::new(o.budget_mib, 0, o.slots as usize),
     );
     let (tx, rx) = std::sync::mpsc::channel();
@@ -272,7 +298,8 @@ fn serve(o: &Opts) -> i32 {
         res.seed_costs(load_costs(d));
     }
     let sched = Scheduler::new(o.queue, o.budget_mib);
-    let _worker = sched.run_worker(backend, gate(o), res);
+    let live: Arc<Mutex<Option<Arc<bus::Bus>>>> = Arc::default();
+    let _worker = sched.run_worker(backend, gate(o), Box::new(LiveBus(live.clone())), res);
     if let Some(d) = o.state_dir.clone() {
         let s = sched.clone();
         std::thread::spawn(move || {
@@ -298,7 +325,9 @@ fn serve(o: &Opts) -> i32 {
         match bus::Bus::connect(&sock, &token) {
             Ok(c) => {
                 backoff = Duration::from_secs(1);
+                *live.lock().unwrap_or_else(|p| p.into_inner()) = Some(c.bus.clone());
                 one_connection(o, &catalog, &sched, c);
+                *live.lock().unwrap_or_else(|p| p.into_inner()) = None;
                 eprintln!("{TAG} cogbus connection ended; reconnecting");
             }
             Err(e) => eprintln!("{TAG} {e}; retrying in {backoff:?}"),
@@ -312,15 +341,12 @@ fn serve(o: &Opts) -> i32 {
 fn one_connection(o: &Opts, catalog: &Catalog, sched: &Scheduler, c: bus::Connected) {
     let bus::Connected {
         bus,
-        mut reader,
+        calls,
         node_id,
-        ..
     } = c;
-    let bus = Arc::new(bus);
-    let serve_id = match bus.serve(KIND, &o.service, SCHEMA) {
-        Ok(id) => id,
-        Err(e) => return eprintln!("{TAG} {e}"),
-    };
+    if let Err(e) = bus.serve(KIND, &o.service, SCHEMA) {
+        return eprintln!("{TAG} the broker refused serve: {e}");
+    }
     let stop = Arc::new(AtomicBool::new(false));
     {
         let (bus, sched, stop) = (bus.clone(), sched.clone(), stop.clone());
@@ -349,44 +375,24 @@ fn one_connection(o: &Opts, catalog: &Catalog, sched: &Scheduler, c: bus::Connec
             }
         });
     }
-    loop {
-        let frame = match bus::read_frame(&mut reader) {
-            Ok(Some(f)) => f,
-            Ok(None) => break,
-            Err(e) => {
-                eprintln!("{TAG} {e}");
-                break;
-            }
+    // Ends when the reader thread does: the connection is gone.
+    for frame in calls.iter() {
+        let Some(call) = frame["call"].as_u64() else {
+            continue;
         };
-        match frame["type"].as_str() {
-            Some("call") => {
-                let Some(call) = frame["call"].as_u64() else {
-                    continue;
-                };
-                let timeout = Duration::from_millis(frame["timeout_ms"].as_u64().unwrap_or(30_000));
-                let b = bus.clone();
-                service::submit(
-                    catalog,
-                    sched,
-                    &frame["body"],
-                    timeout,
-                    Box::new(move |r| {
-                        if let Err(e) = b.reply(call, r) {
-                            eprintln!("{TAG} reply to call {call}: {e}");
-                        }
-                    }),
-                );
-            }
-            Some("error") => {
-                let msg = frame["message"].as_str().unwrap_or("?");
-                if frame["id"].as_u64() == Some(serve_id) {
-                    eprintln!("{TAG} the broker refused serve: {msg}");
-                    break;
+        let timeout = Duration::from_millis(frame["timeout_ms"].as_u64().unwrap_or(30_000));
+        let b = bus.clone();
+        service::submit(
+            catalog,
+            sched,
+            &frame["body"],
+            timeout,
+            Box::new(move |r| {
+                if let Err(e) = b.reply(call, r) {
+                    eprintln!("{TAG} reply to call {call}: {e}");
                 }
-                eprintln!("{TAG} broker: {msg}");
-            }
-            _ => {}
-        }
+            }),
+        );
     }
     stop.store(true, Ordering::Relaxed);
 }
