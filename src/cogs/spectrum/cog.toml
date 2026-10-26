@@ -1,0 +1,122 @@
+[cog]
+id = "spectrum"
+name = "Spectrum and Band Occupancy"
+version = "0.1.0"
+category = "industrial"
+description = "Reads the PlutoSDR owner's IQ stream (iq.cs16.v1) from the node's cogbus and publishes a Welch power spectrum every couple of seconds (spectrum.psd.v1, 256 bins in dBFS) and, every minute, a band occupancy reading for each band the radio visited (telemetry.v1: the busy share overall and in eight slices of the usable band, noise floor, peak, the share of the minute the radio spent there). Loss is counted, never hidden: samples the owner declared lost, samples this cog missed because it fell behind the ring, and samples from a dead all-zero receive path are kept out of the spectrum and reported with the fraction of the stream they make up. It never opens the radio; it can ask the owner to visit a band with --ask-plan. Levels are dBFS of the 12-bit converter and are marked uncalibrated outside the chip's rated 325 to 3800 MHz."
+binary = "cog-spectrum-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: none. It reads the cogbus ring of the owner cog and opens no bus or device.
+interfaces = ["none"]
+
+[config]
+
+[config.source]
+type = "string"
+label = "IQ source"
+description = "Source id of the owner's iq.cs16/<name> stream (the owner's service name)"
+default = "venq-pluto"
+cli_arg = "--source"
+
+[config.ask_plan]
+type = "string"
+label = "Ask the owner for bands"
+description = "Bands to ask the owner to visit: centre_hz:rate:dwell_ms[:bandwidth[:gain|auto]], comma separated. Empty analyses whatever the owner is tuned to."
+default = ""
+cli_arg = "--ask-plan"
+
+[config.psd_secs]
+type = "integer"
+label = "Spectrum window"
+description = "Seconds of stream averaged into one spectrum reading"
+default = 2
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--psd-secs"
+
+[config.occ_secs]
+type = "integer"
+label = "Occupancy interval"
+description = "Seconds per band occupancy reading"
+default = 60
+min = 1
+max = 86400
+unit = "seconds"
+cli_arg = "--occ-secs"
+
+[config.thresh_db]
+type = "number"
+label = "Busy threshold"
+description = "A bin is busy when it is this far above the median bin of its frame"
+default = 10.0
+min = 3.0
+max = 40.0
+unit = "dB"
+cli_arg = "--thresh-db"
+advanced = true
+
+[config.fft]
+type = "integer"
+label = "FFT size"
+description = "Points per frame, a power of two. 1024 at 5 MS/s gives 4.9 kHz bins."
+default = 1024
+min = 64
+max = 16384
+cli_arg = "--fft"
+advanced = true
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between stdout reports"
+default = 60
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.api_bind]
+type = "string"
+label = "HTTP bind"
+description = "/status /raw /guide /healthz"
+default = "127.0.0.1:8064"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "With --once: a synthetic band marked SYNTHETIC through the whole pipeline"
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# What this cog reads and publishes on the node's cogbus (WeftOS ADR-122). It also calls the
+# owner's tuner service when --ask-plan is set.
+
+[[inputs]]
+topic = "iq.cs16"
+schema = "iq.cs16.v1"
+policy = "drop-oldest"
+
+[[inputs]]
+topic = "svc.sdr"
+schema = "sdr.v1"
+
+[[outputs]]
+topic = "spectrum.psd"
+schema = "spectrum.psd.v1"
+class = "reading"
+rate = "every 2 s per band"
+
+[[outputs]]
+topic = "band.occupancy"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every 60 s per band"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 30
+output_limit_bytes = 65536

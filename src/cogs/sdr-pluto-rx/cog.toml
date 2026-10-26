@@ -1,0 +1,128 @@
+[cog]
+id = "sdr-pluto-rx"
+name = "PlutoSDR Receiver"
+version = "0.1.0"
+category = "industrial"
+description = "Owns a PlutoSDR (Zynq-7010 with an AD9363A, run as an AD9364 for 70 to 6000 MHz) through libiio and is the only process that opens it. On taking the radio it switches digital loopback and the DDS tones off and sets the TX attenuation to maximum, so a crashed earlier client cannot leave it muted or radiating. It streams the samples as iq.cs16.v1 on the node's cogbus with every lost sample counted against the host clock (the stream has no hardware timestamps), publishes the radio's tuning, temperatures, delivered against expected samples, gap events and all-zero detection as sdr.status, and serves svc.sdr so consumers share the one tuner by band plan, lease or retune. Receive only: tx_config is refused. The declared range is the measured 70 to 6000 MHz; the part is rated 325 to 3800 MHz and bands outside it are marked uncalibrated."
+binary = "cog-sdr-pluto-rx-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/pluto.rs, src/iio.rs: sdr (libiio, over USB or over the Pluto network gadget at 192.168.2.1)
+interfaces = ["sdr"]
+
+[config]
+
+[config.service]
+type = "string"
+label = "Service name"
+description = "Source id of iq.cs16/<name>, sdr.status/<name> and svc.sdr/<name> on this node"
+default = "venq-pluto"
+cli_arg = "--service"
+
+[config.band_plan]
+type = "string"
+label = "Band plan"
+description = "Bands that take turns while no consumer has asked for its own: centre_hz:rate:dwell_ms[:bandwidth[:gain|auto]], comma separated. A single band streams continuously."
+default = "2437e6:5e6:1000"
+cli_arg = "--band-plan"
+
+[config.backend]
+type = "select"
+label = "Backend"
+description = "How libiio reaches the radio. auto measures both at start and uses the faster (ip: on the Ventuno Q, which also needs the Pluto's network gadget; usb: on macOS)."
+default = "auto"
+options = ["auto", "ip", "usb"]
+cli_arg = "--backend"
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 10
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Capture window (--once)"
+description = "Seconds of the first band captured by a single --once run"
+default = 3
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--window"
+
+[config.iio_buffer]
+type = "integer"
+label = "Read size"
+description = "Samples per libiio read, cut into 8192-sample ring records. 8192 cannot keep up with 5 MS/s over the network backend; 32768 to 524288 measured gap-free."
+default = 65536
+min = 4096
+max = 4194304
+unit = "samples"
+cli_arg = "--iio-buffer"
+advanced = true
+
+[config.ring_mib]
+type = "integer"
+label = "IQ ring size"
+description = "Shared-memory ring for iq.cs16; at 5 MS/s each MiB holds about 52 ms"
+default = 16
+min = 1
+max = 256
+unit = "MiB"
+cli_arg = "--ring-mib"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "HTTP bind"
+description = "/status /raw /guide /healthz. Loopback by default because /raw hands out IQ."
+default = "127.0.0.1:8063"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "A synthetic signal marked SYNTHETIC, no radio"
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# What this cog publishes and serves on the node's cogbus (WeftOS ADR-122). Raw IQ stays on the
+# node: a consumer on another node needs an explicit exposure that allows raw data.
+#
+# A cog that reads the stream or calls the tuner lists, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "iq.cs16"
+#   schema = "iq.cs16.v1"
+#
+#   [[inputs]]
+#   topic = "svc.sdr"
+#   schema = "sdr.v1"
+
+[[outputs]]
+topic = "iq.cs16"
+schema = "iq.cs16.v1"
+class = "stream"
+rate = "continuous, up to 5 MS/s (20 MB/s)"
+
+[[outputs]]
+topic = "sdr.status"
+schema = "sdr.status.v1"
+class = "reading"
+rate = "every 2 s"
+
+[[outputs]]
+topic = "svc.sdr"
+schema = "sdr.v1"
+class = "reading"
+rate = "on demand; one reply per call"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

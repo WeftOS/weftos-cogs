@@ -1,0 +1,50 @@
+# Sensor guide for sdr-pluto-rx (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are Markdown files next to this one (guide/<page>.md). The radio is a USB device, so
+# there is no header pinout or wiring: the only diagram is the signal flow.
+
+schema = 1
+title = "PlutoSDR receive on a Linux board"
+sensor = "PlutoSDR Nano (Zynq-7010 + AD9363A, run as AD9364) over USB, libiio"
+cog = "sdr-pluto-rx"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "connect", "range", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+sensor_found = "connect"
+plug_orientation = "connect"
+power = "connect"
+antenna = "connect"
+heat = "troubleshoot"
+range = "range"
+cog_installed = "setup"
+cog_running = "setup"
+export = "setup"
+no_source = "troubleshoot"
+loss = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "Antenna"
+detail = "RX port A, 70-6000 MHz measured"
+
+[[flow]]
+name = "AD9363A / AD9364"
+detail = "LO, filter, ADC, up to 56 MHz"
+
+[[flow]]
+name = "USB 2.0"
+detail = "7.5 MS/s ceiling, 5 MS/s safe"
+
+[[flow]]
+name = "libiio"
+detail = "ip: on Linux, usb: on macOS"
+
+[[flow]]
+name = "sdr-pluto-rx cog"
+detail = "owner, band plans, loss counted"
+
+[[flow]]
+name = "Outputs"
+detail = "iq.cs16.v1 ring, sdr.status, svc.sdr"
