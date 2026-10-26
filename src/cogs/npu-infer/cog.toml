@@ -11,11 +11,16 @@ interfaces = ["npu"]
 
 # GenieX is a Go program that reserves a large address space and maps model files and NPU
 # buffers; the host applies [resources].ram_mb as an address-space limit (RLIMIT_AS) on the cog and
-# on every child. The default of 256 MiB makes GenieX die at start ("failed to reserve page summary
-# memory"), so the cog asks for the most the host allows. Resident memory is bounded by the
-# cog's own --budget-mib, not by this.
+# on every child, and the planner also reserves it from the node's free memory. The default of
+# 256 MiB makes GenieX die at start ("failed to reserve page summary memory").
+# Smallest limit GenieX loaded and answered under (Ventuno Q, nctx 2048, 2026-10-26):
+#   gemma3-1b 4 GiB, qwen3.5-0.8b 4 GiB, gemma4-e2b 8 GiB, qwen3-4b (W4A16) 11 GiB (peak 10.7 GiB
+#   on a 1.2k-token prompt), qwen3-vl-4b at most 12 GiB (not narrowed).
+# 10240 covers the first three with 25% margin on the largest of them. A deployment that serves
+# qwen3-4b or the vision models needs 14336 or more, which the planner only accepts on a node with
+# that much free memory.
 [resources]
-ram_mb = 65536
+ram_mb = 10240
 
 [config]
 
