@@ -63,3 +63,28 @@ fn a_replayed_file_goes_through_the_same_report() {
     assert_eq!(r["rms_dbfs"], -120.0);
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn the_report_shows_the_gain_and_the_clip_counters() {
+    let out = bin()
+        .args(["--once", "--simulate", "--gain-db", "30"])
+        .output()
+        .unwrap();
+    let r: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(r["gain_db"], 30.0);
+    assert!(
+        r["mixer_gain_pct"].as_u64().is_some(),
+        "the default capture level is reported: {r}"
+    );
+    assert!(r["mixer"].is_null(), "a simulated source touches no mixer");
+    assert_eq!(r["clipping"], true, "+30 dB on the tone saturates it: {r}");
+    assert!(
+        r["clipped_chunks"].as_u64().unwrap() > 0 && r["clipped_samples"].as_u64().unwrap() > 0
+    );
+    let quiet = bin().args(["--once", "--simulate"]).output().unwrap();
+    let q: serde_json::Value = serde_json::from_slice(&quiet.stdout).unwrap();
+    assert_eq!(
+        (q["clipping"].clone(), q["clipped_chunks"].clone()),
+        (serde_json::json!(false), serde_json::json!(0))
+    );
+}

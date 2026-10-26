@@ -20,7 +20,9 @@ Schema `pcm.s16le.v1`, class `stream`. Each record is 640 bytes: 320 mono sample
 | `rate_hz`, `channels`, `chunk_ms`, `chunk_bytes` | numbers | 16000, 1, 20, 640 |
 | `chunks`, `chunks_per_s` | numbers | chunks in the window and their rate (50 when healthy) |
 | `rms_dbfs`, `peak_dbfs` | number/null | window level |
-| `clipped_samples`, `short_reads` | numbers | |
+| `clipped_samples`, `clipped_chunks`, `short_reads` | numbers | samples at full scale (after software gain); chunks holding any |
+| `clipping` | bool | more than 1% of the window's chunks clipped |
+| `gain_db`, `mixer_gain_pct`, `mixer` | number, number/null, string/null | software gain; the capture level set at start; what amixer reported or why it was not set |
 | `devices` | array | what the host handed |
 | `bus` | object | `connected`, `topic`, `seq`, `write_errors`, `error` |
 | `error` | string | only with `no_source` |
@@ -46,4 +48,4 @@ Eight floats; a source that is absent is **-1**.
 
 ## Settings
 
-`--interval`, `--window`, `--source`, `--card-name`, `--device`, `--api-bind`, `--replay`, `--simulate`.
+`--interval`, `--window`, `--source`, `--card-name`, `--mixer-gain`, `--mixer-control`, `--gain-db`, `--device`, `--api-bind`, `--replay`, `--simulate`.

@@ -30,6 +30,11 @@ const TAG: &str = "[cog-audio-in]";
 /// Per-cog id in the store vector tuple (28=board-telemetry).
 pub(crate) const STORE_ID: u32 = 29;
 const KIND: &str = "audio.pcm";
+/// Capture level set at start: the U20CAM's microphone clips speech at 1 m at 100% (89 of 350
+/// chunks in the calibration run) and peaks at -7 dBFS at 50%.
+const DEFAULT_MIXER_PCT: u8 = 50;
+/// Software gain applied to every chunk before it is measured and published.
+const DEFAULT_GAIN_DB: f64 = 0.0;
 const SCHEMA: &str = "pcm.s16le.v1";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,6 +47,9 @@ struct Opts {
     card_name: Option<String>,
     bus: Option<String>,
     api_bind: String,
+    mixer_gain: Option<u8>,
+    mixer_control: String,
+    gain_db: f64,
     simulate: bool,
     replay: Option<String>,
 }
@@ -93,6 +101,25 @@ fn parse_opts(a: &[String]) -> Opts {
             .map(String::from)
             .or_else(|| std::env::var("WEFTOS_COGBUS").ok()),
         api_bind: arg(a, "--api-bind").unwrap_or("127.0.0.1:8063").to_string(),
+        mixer_gain: match arg(a, "--mixer-gain") {
+            Some("off") => None,
+            Some(v) => v
+                .parse::<u8>()
+                .ok()
+                .filter(|p| *p <= 100)
+                .or(Some(DEFAULT_MIXER_PCT)),
+            None => Some(DEFAULT_MIXER_PCT),
+        },
+        mixer_control: arg(a, "--mixer-control")
+            .filter(|c| {
+                !c.is_empty()
+                    && c.len() <= 32
+                    && c.chars()
+                        .all(|ch| ch.is_alphanumeric() || " _-".contains(ch))
+            })
+            .unwrap_or("Mic")
+            .to_string(),
+        gain_db: num(a, "--gain-db", DEFAULT_GAIN_DB, -40.0, 40.0),
         simulate: a.iter().any(|x| x == "--simulate"),
         replay: arg(a, "--replay").map(String::from),
     }
@@ -188,13 +215,16 @@ impl Source {
     }
 }
 
-fn open_source(o: &Opts) -> Result<Source, String> {
+fn open_source(o: &Opts) -> Result<(Source, Option<String>), String> {
     if o.simulate {
-        return Ok(Source::Synth(0, Pacer::new()));
+        return Ok((Source::Synth(0, Pacer::new()), None));
     }
     if let Some(f) = &o.replay {
         let bytes = std::fs::read(f).map_err(|e| format!("replay {f}: {e}"))?;
-        return Ok(Source::Replay(alsa::pcm_from_file(&bytes), 0, Pacer::new()));
+        return Ok((
+            Source::Replay(alsa::pcm_from_file(&bytes), 0, Pacer::new()),
+            None,
+        ));
     }
     let dev = match &o.device {
         Some(d) => d.clone(),
@@ -209,7 +239,14 @@ fn open_source(o: &Opts) -> Result<Source, String> {
             alsa::pick_capture(&handed, &cards, o.card_name.as_deref())?
         }
     };
-    Arecord::start(&dev).map(|a| Source::Alsa(a, dev))
+    // The capture level is set before the stream starts and stays set: it is the card's
+    // mixer, not this process's.
+    let note = o.mixer_gain.map(|p| match alsa::card_of(&dev) {
+        Some(card) => alsa::set_mixer(card, &o.mixer_control, p)
+            .map_or_else(|e| format!("not set: {e}"), |s| format!("set to {p}%: {s}")),
+        None => format!("not set: no card number in {dev:?}"),
+    });
+    Arecord::start(&dev).map(|a| (Source::Alsa(a, dev), note))
 }
 
 /// Counters over one report window.
@@ -219,6 +256,7 @@ struct Window {
     power: f64,
     peak_db: f64,
     clipped: u64,
+    clip_chunks: u64,
     short: u64,
 }
 
@@ -232,6 +270,7 @@ impl Window {
             self.peak_db.max(l.peak_dbfs)
         };
         self.clipped += l.clipped as u64;
+        self.clip_chunks += (l.clipped > 0) as u64;
     }
 
     fn rms_db(&self) -> f64 {
@@ -255,6 +294,9 @@ struct BusState {
 
 /// What a report says besides the window's counters.
 struct Context<'a> {
+    gain_db: f64,
+    mixer_gain: Option<u8>,
+    mixer_note: Option<&'a str>,
     status: &'a str,
     source: &'a str,
     secs: f64,
@@ -266,6 +308,9 @@ struct Context<'a> {
 
 fn build_report(win: &Window, c: &Context) -> (Value, [f64; 8]) {
     let Context {
+        gain_db: _,
+        mixer_gain: _,
+        mixer_note: _,
         status,
         source,
         secs,
@@ -307,6 +352,12 @@ fn build_report(win: &Window, c: &Context) -> (Value, [f64; 8]) {
         "rms_dbfs": if ok { json!(round(win.rms_db(), 2)) } else { Value::Null },
         "peak_dbfs": if ok { json!(round(win.peak_db, 2)) } else { Value::Null },
         "clipped_samples": win.clipped,
+        "clipped_chunks": win.clip_chunks,
+        // Clipping in more than 1% of chunks distorts speech: lower the mixer or the gain.
+        "clipping": win.clip_chunks * 100 > win.chunks,
+        "gain_db": c.gain_db,
+        "mixer_gain_pct": c.mixer_gain,
+        "mixer": c.mixer_note,
         "devices": devices,
         "bus": {
             "connected": bus.connected, "topic": bus.topic, "seq": bus.seq,
@@ -331,6 +382,7 @@ fn telemetry_items(win: &Window, bus: &BusState) -> Vec<Value> {
         i("level.rms", win.rms_db(), "dBFS"),
         i("level.peak", win.peak_db, "dBFS"),
         i("level.clipped", win.clipped as f64, ""),
+        i("level.clip_chunks", win.clip_chunks as f64, ""),
         i("stream.seq", bus.seq as f64, ""),
         i("bus.connected", bus.connected as u8 as f64, ""),
     ]
@@ -494,6 +546,7 @@ fn main() {
     );
 
     let mut source: Option<Source> = None;
+    let mut mixer_note: Option<String> = None;
     let mut open_err: Option<String> = None;
     let mut win = Window::default();
     let mut t0 = Instant::now();
@@ -502,8 +555,15 @@ fn main() {
     loop {
         if source.is_none() {
             match open_source(&o) {
-                Ok(s) => {
-                    eprintln!("{TAG} capturing from {}", s.label());
+                Ok((s, note)) => {
+                    eprintln!(
+                        "{TAG} capturing from {}{}",
+                        s.label(),
+                        note.as_deref()
+                            .map(|n| format!(" (mixer {n})"))
+                            .unwrap_or_default()
+                    );
+                    mixer_note = note;
                     source = Some(s);
                 }
                 Err(e) => {
@@ -516,6 +576,7 @@ fn main() {
             match s.next(&mut buf) {
                 Ok(true) => {
                     open_err = None;
+                    alsa::apply_gain(&mut buf, o.gain_db);
                     win.add(alsa::level(&buf));
                     link.write(&buf);
                     if last_raw.elapsed() >= Duration::from_millis(250) {
@@ -560,6 +621,9 @@ fn main() {
                 .as_ref()
                 .map_or_else(|| "none".to_string(), Source::label);
             let ctx = Context {
+                gain_db: o.gain_db,
+                mixer_gain: o.mixer_gain,
+                mixer_note: mixer_note.as_deref(),
                 status,
                 source: &label,
                 secs: t0.elapsed().as_secs_f64(),
@@ -616,6 +680,16 @@ mod tests {
         assert_eq!(o.interval, 5, "out of range falls back to the default");
         assert_eq!(o.source, "mic0", "a bad source id falls back");
         assert_eq!(o.device.as_deref(), Some("hw:1,0"));
+        assert_eq!(parse_opts(&s(&["--mixer-gain", "off"])).mixer_gain, None);
+        assert_eq!(parse_opts(&s(&["--mixer-gain", "30"])).mixer_gain, Some(30));
+        assert_eq!(
+            parse_opts(&s(&["--mixer-gain", "300"])).mixer_gain,
+            Some(50),
+            "out of range: the default"
+        );
+        assert_eq!(parse_opts(&s(&[])).mixer_gain, Some(50));
+        assert_eq!(parse_opts(&s(&["--gain-db", "-6"])).gain_db, -6.0);
+        assert_eq!(parse_opts(&s(&["--gain-db", "99"])).gain_db, 0.0);
         let d = parse_opts(&s(&[]));
         assert_eq!(
             (d.api_bind.as_str(), d.window, d.source.as_str()),
@@ -646,6 +720,9 @@ mod tests {
             ..Default::default()
         };
         let ctx = Context {
+            gain_db: 0.0,
+            mixer_gain: None,
+            mixer_note: None,
             status: "simulate",
             source: "simulated",
             secs: 1.0,
@@ -675,6 +752,9 @@ mod tests {
     #[test]
     fn no_source_reports_the_reason_and_an_empty_vector() {
         let ctx = Context {
+            gain_db: 0.0,
+            mixer_gain: None,
+            mixer_note: None,
             status: "no_source",
             source: "none",
             secs: 1.0,
@@ -718,7 +798,7 @@ mod tests {
         let mut src = open_source(&o).unwrap();
         let mut buf = [0u8; CHUNK_BYTES];
         let mut n = 0;
-        while src.next(&mut buf).unwrap() {
+        while src.0.next(&mut buf).unwrap() {
             n += 1;
         }
         assert_eq!(n, 3, "the partial tail is not a chunk");

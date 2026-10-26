@@ -19,7 +19,7 @@ The device delivers digital silence: a muted capture control or the wrong card. 
 
 ## Level is high and `clipped_samples` grows
 
-Lower the capture gain with `amixer`.
+The report's `clipping` is true when more than 1% of chunks hold a clipped sample. The cog sets the card's capture level at start (**Capture level**, 50% by default) and applies **Software gain** (0 dB). Calibrated on the Ventuno's U20CAM with speech at about 1 m: 100% clipped 89 of 350 chunks; 70% peaked at -2.3 dBFS; 50% at -7 dBFS with no clipping; 20% at -14 dBFS. Lower **Capture level** for a louder room, raise it for a quiet or distant voice, or set it to `off` to leave the card alone. The setting stays on the card after the cog stops; restore it with `amixer -c <card> sset Mic 100%`.
 
 ## `bus.connected` is false
 

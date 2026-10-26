@@ -62,6 +62,57 @@ pub fn pick_capture(devices: &[String], cards: &str, want: Option<&str>) -> Resu
     })
 }
 
+/// The card number in an ALSA device name: `plughw:1,0`, `hw:1,0`, `hw:1`.
+pub fn card_of(dev: &str) -> Option<u32> {
+    let rest = dev.split_once(':')?.1;
+    rest.split(',').next()?.parse().ok()
+}
+
+/// Set the capture level of `control` (say `Mic`) on `card` to `pct` percent with `amixer`.
+/// Returns what amixer reports for the control afterwards.
+pub fn set_mixer(card: u32, control: &str, pct: u8) -> Result<String, String> {
+    let out = Command::new("amixer")
+        .args([
+            "-c",
+            &card.to_string(),
+            "sset",
+            control,
+            &format!("{}%", pct.min(100)),
+        ])
+        .output()
+        .map_err(|e| format!("amixer: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "amixer sset {control}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .rev()
+        .find(|l| l.contains('%'))
+        .unwrap_or("")
+        .trim()
+        .to_string())
+}
+
+/// Scale s16le samples by `gain_db`, saturating (a no-op at 0 dB). Returns the samples that
+/// saturated because of the gain.
+pub fn apply_gain(chunk: &mut [u8], gain_db: f64) -> u32 {
+    if gain_db == 0.0 {
+        return 0;
+    }
+    let k = 10f64.powf(gain_db / 20.0);
+    let mut sat = 0;
+    for s in chunk.chunks_exact_mut(2) {
+        let v = i16::from_le_bytes([s[0], s[1]]) as f64 * k;
+        let c = v.round().clamp(-32768.0, 32767.0);
+        sat += (c != v.round()) as u32;
+        s.copy_from_slice(&(c as i16).to_le_bytes());
+    }
+    sat
+}
+
 /// Level of one chunk of s16le samples.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Level {
@@ -211,6 +262,40 @@ mod tests {
         assert!(e.contains("no handed capture card matches"), "{e}");
         let e = pick_capture(&devs(&["/dev/snd/pcmC0D0p"]), CARDS, None).unwrap_err();
         assert!(e.contains("no capture node"), "{e}");
+    }
+
+    #[test]
+    fn the_card_number_comes_out_of_the_device_name() {
+        assert_eq!(card_of("plughw:1,0"), Some(1));
+        assert_eq!(card_of("hw:12,3"), Some(12));
+        assert_eq!(card_of("hw:2"), Some(2));
+        assert_eq!(card_of("default"), None);
+        assert_eq!(card_of("plughw:CARD=U20CAM,DEV=0"), None);
+    }
+
+    #[test]
+    fn software_gain_scales_and_saturates() {
+        let mut c: Vec<u8> = [1000i16, -1000, 20000, -20000]
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect();
+        assert_eq!(apply_gain(&mut c, 0.0), 0);
+        assert_eq!(apply_gain(&mut c, -6.0206), 0);
+        let v: Vec<i16> = c
+            .chunks_exact(2)
+            .map(|b| i16::from_le_bytes([b[0], b[1]]))
+            .collect();
+        assert_eq!(v, [500, -500, 10000, -10000]);
+        assert_eq!(
+            apply_gain(&mut c, 12.0412),
+            2,
+            "x4: 10000 would be 40000, so two samples saturate"
+        );
+        let v: Vec<i16> = c
+            .chunks_exact(2)
+            .map(|b| i16::from_le_bytes([b[0], b[1]]))
+            .collect();
+        assert_eq!(v, [2000, -2000, 32767, -32768]);
     }
 
     #[test]
