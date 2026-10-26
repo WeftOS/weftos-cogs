@@ -1,0 +1,110 @@
+[cog]
+id = "audio-in"
+name = "Audio In"
+version = "0.1.0"
+category = "signal"
+description = "Owns the node's ALSA capture device and publishes 16 kHz mono 16-bit PCM in 20 ms chunks as the cogbus stream audio.pcm/<source>. Every other cog hears the microphone by subscribing to that stream; none opens the device. The device is the one the host hands the owner (WEFTOS_DEVICES), chosen by card name when the node has several. Reports level in dBFS, short reads and bus state, and fails honestly with no_source when no capture device is handed or present."
+binary = "cog-audio-in-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/alsa.rs: audio-in (runs arecord on the handed /dev/snd/pcmC*D*c node)
+interfaces = ["audio-in"]
+
+# The devices this cog owns. The node refuses a second cog that claims the same capture node
+# or names it in its arguments (WeftOS ADR-122 section 4b).
+[[devices]]
+path = "/dev/snd/pcmC*D*c"
+access = "ro"
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Capture window (--once)"
+description = "Seconds of audio captured by a single --once run"
+default = 1
+min = 1
+max = 30
+unit = "seconds"
+cli_arg = "--window"
+
+[config.source]
+type = "string"
+label = "Source id"
+description = "Source id of the stream: audio.pcm/<source>. Lowercase letters, digits, dot, dash, underscore."
+default = "mic0"
+cli_arg = "--source"
+
+[config.card_name]
+type = "string"
+label = "Card name"
+description = "Substring of the card name in /proc/asound/cards. Picks one capture card when the host handed several (for example the camera's microphone). Empty: the lowest card."
+default = ""
+cli_arg = "--card-name"
+
+[config.device]
+type = "string"
+label = "ALSA device"
+description = "ALSA device by hand, for example plughw:1,0. Overrides the handed devices; use it for a bench run only."
+default = ""
+cli_arg = "--device"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8063"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Play a WAV or raw 16 kHz mono s16le file through the same path instead of capturing. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Publish a synthetic tone marked SYNTHETIC instead of capturing. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# What this cog publishes. A cog that listens declares, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "audio.pcm"
+#   schema = "pcm.s16le.v1"
+#   policy = "drop-oldest"
+#
+# and reads the stream audio.pcm/<source>. Records are raw s16le, 640 bytes; t_ns is the capture clock.
+
+[[outputs]]
+topic = "audio.pcm"
+schema = "pcm.s16le.v1"
+class = "stream"
+rate = "16000 Hz mono, 20 ms chunks"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

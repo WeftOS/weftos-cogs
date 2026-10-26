@@ -1,0 +1,111 @@
+[cog]
+id = "audio-out"
+name = "Audio Out"
+version = "0.1.0"
+category = "signal"
+description = "Owns the node's ALSA playback device and plays the 16 kHz mono 16-bit PCM stream it is sent: the cogbus stream audio.pcm/<source> (default tts0), written by a speech-synthesis or other audio cog. No other cog opens the speaker. The device is the one the host hands the owner (WEFTOS_DEVICES), chosen by card name when the node has several. Reports chunks played, drops, latency and level, and fails honestly with no_source when no playback device is handed or present."
+binary = "cog-audio-out-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/alsa.rs: audio-out (runs aplay on the handed /dev/snd/pcmC*D*p node)
+interfaces = ["audio-out"]
+
+# The devices this cog owns. The node refuses a second cog that claims the same playback node
+# or names it in its arguments (WeftOS ADR-122 section 4b).
+[[devices]]
+path = "/dev/snd/pcmC*D*p"
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Play window (--once)"
+description = "Seconds a single --once run plays or listens for"
+default = 1
+min = 1
+max = 30
+unit = "seconds"
+cli_arg = "--window"
+
+[config.source]
+type = "string"
+label = "Stream to play"
+description = "Source id of the audio.pcm stream to play: audio.pcm/<source>"
+default = "tts0"
+cli_arg = "--source"
+
+[config.name]
+type = "string"
+label = "Name"
+description = "Source id of this cog's own telemetry reading"
+default = "spk0"
+cli_arg = "--name"
+advanced = true
+
+[config.card_name]
+type = "string"
+label = "Card name"
+description = "Substring of the card name in /proc/asound/cards. Picks one playback card when the host handed several. Empty: the lowest card."
+default = ""
+cli_arg = "--card-name"
+
+[config.device]
+type = "string"
+label = "ALSA device"
+description = "ALSA device by hand, for example plughw:0,1. Overrides the handed devices; use it for a bench run only."
+default = ""
+cli_arg = "--device"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8064"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Play a WAV or raw 16 kHz mono s16le file through the device instead of the stream. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Play a synthetic tone into a null sink (no device is opened), marked SYNTHETIC. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# What this cog reads and publishes. The stream is written by another cog (for example a
+# speech-synthesis cog declaring [[outputs]] audio.pcm with pcm.s16le.v1). Records are raw
+# s16le, 640 bytes, 20 ms.
+
+[[inputs]]
+topic = "audio.pcm"
+schema = "pcm.s16le.v1"
+policy = "drop-oldest"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

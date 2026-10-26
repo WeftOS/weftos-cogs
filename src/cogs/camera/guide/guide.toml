@@ -1,0 +1,35 @@
+# Sensor guide for camera (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are Markdown files next to this one (guide/<page>.md).
+
+schema = 1
+title = "A USB camera on a Linux board"
+sensor = "V4L2 camera (UVC, MJPEG)"
+cog = "camera"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "device", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+cog_installed = "setup"
+cog_running = "setup"
+device = "device"
+frames = "troubleshoot"
+no_source = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "Camera"
+detail = "UVC, MJPEG"
+
+[[flow]]
+name = "gst-launch-1.0"
+detail = "v4l2src to multifilesink"
+
+[[flow]]
+name = "camera cog"
+detail = "hash, size, keep for ttl"
+
+[[flow]]
+name = "Outputs"
+detail = "frame-ref readings, /frame.jpg, :8065"

@@ -1,0 +1,101 @@
+[cog]
+id = "mcu-bridge"
+name = "MCU Bridge"
+version = "0.1.0"
+category = "industrial"
+description = "Owns the board's arduino-router socket and the WeftOS sketch on the MCU behind it. Serves the sketch to other cogs as the cogbus service svc.mcu/<service>: a method name and up to eight scalar parameters in, the sketch's return value out. Only the methods on its allowlist are forwarded (weftos_ping and weftos_calls by default). Checks every interval that the sketch answers weftos_ping with 42 and reports mcu: foreign-sketch when another sketch has replaced it, and no_source when the router socket is not there."
+binary = "cog-mcu-bridge-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/router.rs: mcu (connects to the arduino-router socket and speaks msgpack-RPC to it)
+interfaces = ["mcu"]
+
+# The device this cog owns. The node refuses a second cog that claims the router socket or
+# names it in its arguments (WeftOS ADR-122 section 4b). The socket is root:arduino-router 0660,
+# so the cog's user needs the arduino-router group (gid 127) and nothing else on the MCU side.
+[[devices]]
+socket = "/run/arduino-router.sock"
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Probe interval"
+description = "Seconds between probes of the sketch and reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.service]
+type = "string"
+label = "Service name"
+description = "Source id of the service topic svc.mcu/<name> on this node"
+default = "venq-mcu"
+cli_arg = "--service"
+
+[config.allow]
+type = "string"
+label = "Allowed methods"
+description = "Comma-separated sketch methods other cogs may call. Anything else is refused. Method names are lowercase letters, digits, underscore and dot."
+default = "weftos_ping,weftos_calls"
+cli_arg = "--allow"
+
+[config.socket]
+type = "string"
+label = "Router socket"
+description = "Path of the arduino-router socket. Empty: the one the host handed the owner, else /run/arduino-router.sock."
+default = ""
+cli_arg = "--socket"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8066"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Answer calls from a file of JSON lines {\"method\": ..., \"result\": ...} instead of the router. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Use a built-in fake router (weftos_ping returns 42, weftos_calls counts) marked SYNTHETIC. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# What this cog provides: svc.mcu/<service> (a service topic; WeftOS ADR-122 section 12) and a
+# telemetry reading. A cog that calls this service lists, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "svc.mcu"
+#   schema = "mcu.call.v1"
+#
+# and calls svc.mcu/venq-mcu with an mcu.call.v1 body, for example {"method": "weftos_ping"}.
+# The reply body is {"result": <the sketch's return value>, "ms": <round trip>}.
+
+[[outputs]]
+topic = "svc.mcu"
+schema = "mcu.call.v1"
+class = "reading"
+rate = "on demand; one reply per call"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every probe interval"
+
+[console]
+allowed_commands = ["--help", "--once", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536
