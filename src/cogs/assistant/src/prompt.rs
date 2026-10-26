@@ -36,13 +36,17 @@ impl History {
         self.turns.len()
     }
 
-    /// The prompt text for `command`, with the remembered turns before it.
+    /// The prompt text for `command`. With no past turns it is the command alone, which a
+    /// chat model answers best; with some, they come first as a short transcript.
     pub fn prompt(&self, command: &str) -> String {
-        let mut s = String::new();
-        for (u, a) in &self.turns {
-            s.push_str(&format!("User: {u}\nAssistant: {a}\n"));
+        if self.turns.is_empty() {
+            return command.to_string();
         }
-        s.push_str(&format!("User: {command}\nAssistant:"));
+        let mut s = String::from("Earlier in this conversation:\n");
+        for (u, a) in &self.turns {
+            s.push_str(&format!("Q: {u}\nA: {a}\n"));
+        }
+        s.push_str(&format!("\nNow answer this: {command}"));
         s
     }
 }
@@ -98,14 +102,15 @@ mod tests {
         let mut h = History::new(2);
         assert_eq!(
             h.prompt("what time is it"),
-            "User: what time is it\nAssistant:"
+            "what time is it",
+            "no past turns: the command alone"
         );
         h.push("hi", "Hello.");
         h.push("how are you", "Fine.");
         h.push("and now", "Still fine.");
         assert_eq!(h.len(), 2, "only the last two are kept");
-        assert_eq!(h.prompt("bye"), "User: how are you\nAssistant: Fine.\nUser: and now\nAssistant: Still fine.\nUser: bye\nAssistant:");
-        assert_eq!(History::new(0).prompt("x"), "User: x\nAssistant:");
+        assert_eq!(h.prompt("bye"), "Earlier in this conversation:\nQ: how are you\nA: Fine.\nQ: and now\nA: Still fine.\n\nNow answer this: bye");
+        assert_eq!(History::new(0).prompt("x"), "x");
     }
 
     #[test]

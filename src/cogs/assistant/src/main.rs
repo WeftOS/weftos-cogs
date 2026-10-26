@@ -153,12 +153,7 @@ impl Brain for Canned {
 
     fn ask(&mut self, body: &Value, _: Duration) -> Result<String, String> {
         let text = body["text"].as_str().unwrap_or_default();
-        let last = text
-            .lines()
-            .rev()
-            .find(|l| l.starts_with("User:"))
-            .unwrap_or("User: ")
-            .trim_start_matches("User: ");
+        let last = text.rsplit("Now answer this: ").next().unwrap_or(text);
         Ok(format!("SYNTHETIC answer to: {last}."))
     }
 }
@@ -648,10 +643,7 @@ mod tests {
             ),
             (Some("qwen3.5-0.8b"), Some(7), Some(96))
         );
-        assert!(b["text"]
-            .as_str()
-            .unwrap()
-            .ends_with("User: what time is it\nAssistant:"));
+        assert_eq!(b["text"], "what time is it");
         assert!(b["system"].as_str().unwrap().len() <= 32 * 1024);
         assert!(b["max_tokens"].as_u64().unwrap() <= 4096 && b["priority"].as_u64().unwrap() <= 9);
     }
@@ -672,7 +664,7 @@ mod tests {
             (st.commands, st.replies, st.failures, h.len()),
             (1, 1, 0, 1)
         );
-        assert!(h.prompt("again").contains("Assistant: It is noon."));
+        assert!(h.prompt("again").contains("A: It is noon."));
     }
 
     #[test]

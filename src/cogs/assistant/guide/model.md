@@ -10,13 +10,14 @@ The cog calls `svc.infer/<service>` (default `venq-npu`) with an `infer.v1` requ
 
 ## The prompt
 
-The remembered turns, oldest first, then the command:
+With no remembered turns the prompt is the command alone, which is what a chat model answers best. With some, they come first as a short transcript:
 
 ```
-User: <earlier command>
-Assistant: <earlier answer>
-User: <this command>
-Assistant:
+Earlier in this conversation:
+Q: <earlier command>
+A: <earlier answer>
+
+Now answer this: <this command>
 ```
 
 ## Choosing a model
