@@ -18,6 +18,7 @@
 6. **Asking for bands.** `--ask-plan` sends the owner a `plan` call (id `spectrum`) with the bands given, so two consumers can share the tuner by band plan; the owner refuses what it cannot run and the cog logs the reason and goes on with what it is given.
 7. **Contract.** stdout JSON per interval, an 8-float store vector (id 30: centre GHz, rate MS/s, occupancy, floor, peak, loss fraction, windows published, uncalibrated), `/status /raw /guide /healthz` on `127.0.0.1:8064` (`/raw` is the newest spectrum reading), `--once --simulate` (a synthetic band marked `SYNTHETIC`) and `--once --replay FILE` (a capture made with the owner's `--record`). The windows and intervals of an offline run follow the stream's own time, so a run is deterministic.
 8. **Schemas.** It uses only registered schema ids: `iq.cs16.v1` in, `spectrum.psd.v1` and `telemetry.v1` out. The call to the owner uses `sdr.v1`, which WeftOS has to register (ADR-176).
+9. **Keep-alive.** It answers the broker's ping with a pong.
 
 ## Consequences
 

@@ -101,6 +101,8 @@ pub struct Acq {
     last_status: u64,
     last_hw: u64,
     last_pub: u64,
+    last_hub: u64,
+    hub: Value,
     records: Option<Recorder>,
     state: &'static str,
 }
@@ -143,6 +145,8 @@ impl Acq {
             last_status: 0,
             last_hw: 0,
             last_pub: 0,
+            last_hub: 0,
+            hub: Value::Null,
             records: None,
             state: "starting",
         }
@@ -390,6 +394,11 @@ impl Acq {
             self.last_hw = t;
             self.hw = radio.hw_status();
         }
+        if self.last_hub == 0 || t - self.last_hub >= 10_000_000_000 {
+            self.last_hub = t;
+            self.hub = crate::hub::scan(std::path::Path::new("/sys/bus/usb/devices"))
+                .unwrap_or(Value::Null);
+        }
         self.publish_status(t, false);
     }
 
@@ -504,6 +513,8 @@ impl Acq {
                 "dds_tones_off": self.safe.dds_tones_off, "notes": self.safe.notes,
             },
             "bus": self.out.info(),
+            "usb_hub": self.hub,
+            "rate_over_advice": self.hub["advised_max_rate_sps"].as_u64().is_some_and(|a| self.cur.as_ref().is_some_and(|(_, b, _)| u64::from(b.rate_sps) > a)),
             "plans": plans,
             "duty": duty,
             "vector": vector,

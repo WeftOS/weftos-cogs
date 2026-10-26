@@ -17,6 +17,7 @@ mod acquire;
 mod bus;
 mod guide;
 mod httpd;
+mod hub;
 mod iio;
 mod ingest;
 mod iq;

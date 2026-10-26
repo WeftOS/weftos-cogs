@@ -317,7 +317,7 @@ fn the_bus_loop_streams_a_ring_serves_calls_and_publishes_status() {
     file.read_exact_at(&mut head, 64).unwrap();
     let head = u64::from_le_bytes(head);
     assert!(head >= 12, "head {head}");
-    let first = head.saturating_sub(count - 3).max(1);
+    let first = head.saturating_sub(100.min(count - 20)).max(1);
     let mut last_idx: Option<u64> = None;
     for seq in first..first + 8 {
         let base = HEADER + ((seq - 1) % count) * size;
