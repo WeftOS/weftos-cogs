@@ -1,4 +1,4 @@
-# ADR-177: spectrum, a consumer of the PlutoSDR stream
+# ADR-189: spectrum, a consumer of the PlutoSDR stream
 
 **Status:** Proposed
 **Date:** 2026-10-26
@@ -6,7 +6,7 @@
 
 ## Context
 
-`sdr-pluto-rx` (ADR-176) owns the radio and streams `iq.cs16.v1` on the node's cogbus with the samples it lost counted. The Ventuno cog plan (P7, phase R3) wants a 2.4 GHz occupancy reading per minute with the loss reported, and a spectrum for the cogs that display or decode: `spectrum.psd.v1` and a band occupancy reading. The radio is rated 325 to 3800 MHz and run as 70 to 6000 MHz, and the owner takes turns between bands, so a consumer sees a stream whose band changes.
+`sdr-pluto-rx` (ADR-188) owns the radio and streams `iq.cs16.v1` on the node's cogbus with the samples it lost counted. The Ventuno cog plan (P7, phase R3) wants a 2.4 GHz occupancy reading per minute with the loss reported, and a spectrum for the cogs that display or decode: `spectrum.psd.v1` and a band occupancy reading. The radio is rated 325 to 3800 MHz and run as 70 to 6000 MHz, and the owner takes turns between bands, so a consumer sees a stream whose band changes.
 
 ## Decision
 
@@ -17,7 +17,7 @@
 5. **Uncalibrated outside the rated range.** Bands outside 325 to 3800 MHz carry `uncalibrated` (a field of the spectrum, an item of the occupancy).
 6. **Asking for bands.** `--ask-plan` sends the owner a `plan` call (id `spectrum`) with the bands given, so two consumers can share the tuner by band plan; the owner refuses what it cannot run and the cog logs the reason and goes on with what it is given.
 7. **Contract.** stdout JSON per interval, an 8-float store vector (id 30: centre GHz, rate MS/s, occupancy, floor, peak, loss fraction, windows published, uncalibrated), `/status /raw /guide /healthz` on `127.0.0.1:8064` (`/raw` is the newest spectrum reading), `--once --simulate` (a synthetic band marked `SYNTHETIC`) and `--once --replay FILE` (a capture made with the owner's `--record`). The windows and intervals of an offline run follow the stream's own time, so a run is deterministic.
-8. **Schemas.** It uses only registered schema ids: `iq.cs16.v1` in, `spectrum.psd.v1` and `telemetry.v1` out. The call to the owner uses `sdr.v1`, which WeftOS has to register (ADR-176).
+8. **Schemas.** It uses only registered schema ids: `iq.cs16.v1` in, `spectrum.psd.v1` and `telemetry.v1` out. The call to the owner uses `sdr.v1`, which WeftOS has to register (ADR-188).
 
 ## Consequences
 

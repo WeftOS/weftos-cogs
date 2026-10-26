@@ -1,5 +1,5 @@
 //! The `iq.cs16.v1` message, as the owner cog (`sdr-pluto-rx`) writes it. This copy decodes; the
-//! encoder is for the tests. The field list is in the owner's `src/iq.rs` and ADR-176.
+//! encoder is for the tests. The field list is in the owner's `src/iq.rs` and ADR-188.
 //!
 //! The stream carries the registered schema (WeftOS `contracts/cogs`, `iq.cs16.v1`): a JSON
 //! object with the common fields `source_id`, `node_id`, `t_ns`, `seq`, then `center_hz`,

@@ -1,4 +1,4 @@
-# ADR-176: sdr-pluto-rx, the owner of the PlutoSDR
+# ADR-188: sdr-pluto-rx, the owner of the PlutoSDR
 
 **Status:** Proposed
 **Date:** 2026-10-26
