@@ -1,0 +1,152 @@
+[cog]
+id = "tts"
+name = "Text to Speech"
+version = "0.1.0"
+category = "ai"
+description = "Speaks text on the node. Reads transcript.v1 readings (transcript/<source>, default reply0, the assistant's answers), synthesizes each with Kokoro or Piper in a sherpa-onnx worker process on the CPU, converts the speech to 16 kHz mono and writes it in real time in 20 ms chunks to the stream audio.pcm/<name> (default tts0) for the audio-out cog to play. Text that arrives while it is speaking waits its turn; more than four waiting drops the oldest. Fails honestly with no_source when the worker or model cannot start."
+binary = "cog-tts-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/worker.rs: none (runs a model worker process; opens no device and no bus)
+interfaces = ["none"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Listen window (--once)"
+description = "Seconds a single --once run listens for"
+default = 10
+min = 1
+max = 120
+unit = "seconds"
+cli_arg = "--window"
+
+[config.source]
+type = "string"
+label = "Text source"
+description = "Source id of the transcripts to speak: transcript/<source>"
+default = "reply0"
+cli_arg = "--source"
+
+[config.name]
+type = "string"
+label = "Stream name"
+description = "Source id of the audio stream this cog writes: audio.pcm/<name>"
+default = "tts0"
+cli_arg = "--name"
+
+[config.engine]
+type = "select"
+label = "Voice engine"
+description = "piper (fast: about a tenth of real time on this board) or kokoro (more natural, slightly slower than real time at three threads)"
+default = "piper"
+options = ["piper", "kokoro"]
+cli_arg = "--engine"
+
+[config.speaker]
+type = "integer"
+label = "Speaker"
+description = "Voice number within the engine (Kokoro has several; Piper amy has one)"
+default = 0
+min = 0
+max = 100
+cli_arg = "--speaker"
+advanced = true
+
+[config.speed]
+type = "string"
+label = "Speed"
+description = "Speaking speed, 0.5 to 2.0 times normal"
+default = "1.0"
+cli_arg = "--speed"
+advanced = true
+
+[config.threads]
+type = "integer"
+label = "Synthesizer threads"
+description = "CPU threads for the synthesizer"
+default = 3
+min = 1
+max = 16
+cli_arg = "--threads"
+advanced = true
+
+[config.python]
+type = "string"
+label = "Python"
+description = "Interpreter with sherpa_onnx and numpy installed. Empty: $TTS_PYTHON, else /data/bench/venv-tts/bin/python."
+default = ""
+cli_arg = "--python"
+advanced = true
+
+[config.models_root]
+type = "string"
+label = "Models directory"
+description = "Directory holding kokoro-en-v0_19 and vits-piper-en_US-amy-medium"
+default = "/data/bench/models"
+cli_arg = "--models-root"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8070"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Speak lines {\"text\": ...} from a file instead of the bus. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Speak a tone per word instead of a voice (no model), marked SYNTHETIC. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# Reads text and writes audio. A cog that listens to the voice lists, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "audio.pcm"
+#   schema = "pcm.s16le.v1"
+#
+# and reads the stream audio.pcm/<name>; the audio-out cog does, with --source <name>.
+
+[[inputs]]
+topic = "transcript"
+schema = "transcript.v1"
+policy = "drop-oldest"
+
+[[outputs]]
+topic = "audio.pcm"
+schema = "pcm.s16le.v1"
+class = "stream"
+rate = "16000 Hz mono, 20 ms chunks, while speaking"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

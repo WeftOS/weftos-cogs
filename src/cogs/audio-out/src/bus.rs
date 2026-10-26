@@ -434,6 +434,16 @@ pub struct Call {
     pub body: Value,
 }
 
+/// A reading delivered to a subscription.
+#[derive(Debug, Clone)]
+pub struct Msg {
+    pub topic: String,
+    pub source_id: String,
+    pub t_ns: u64,
+    pub seq: u64,
+    pub body: Value,
+}
+
 type Pending = Arc<Mutex<HashMap<u64, Sender<Frame>>>>;
 
 /// A ring a stream reader is waiting for or reading.
@@ -459,6 +469,7 @@ pub struct Bus {
     next: AtomicU64,
     pending: Pending,
     calls: Mutex<Option<Receiver<Call>>>,
+    msgs: Mutex<Option<Receiver<Msg>>>,
     subs: Arc<Mutex<Subs>>,
     closed: Arc<AtomicBool>,
     pub node_id: String,
@@ -493,10 +504,11 @@ impl Bus {
         let subs: Arc<Mutex<Subs>> = Arc::default();
         let closed = Arc::new(AtomicBool::new(false));
         let (ctx, crx) = channel();
+        let (mtx, mrx) = channel();
         let (p2, s2, c2) = (pending.clone(), subs.clone(), closed.clone());
         std::thread::spawn(move || {
             while let Ok(Some(f)) = reader.next() {
-                dispatch(f, &p2, &s2, &ctx);
+                dispatch(f, &p2, &s2, &ctx, &mtx);
             }
             c2.store(true, Ordering::Release);
             lock(&p2).clear();
@@ -506,6 +518,7 @@ impl Bus {
             next: AtomicU64::new(2),
             pending,
             calls: Mutex::new(Some(crx)),
+            msgs: Mutex::new(Some(mrx)),
             subs,
             closed,
             node_id,
@@ -525,7 +538,11 @@ impl Bus {
     }
 
     /// Send `req` (its `id` is set here) and wait for the answer.
-    fn request(&self, mut req: Value) -> Result<Frame, String> {
+    fn request(&self, req: Value) -> Result<Frame, String> {
+        self.request_for(req, REQUEST_TIMEOUT)
+    }
+
+    fn request_for(&self, mut req: Value, wait: Duration) -> Result<Frame, String> {
         let id = self.id();
         req["id"] = json!(id);
         let (tx, rx) = channel();
@@ -534,7 +551,7 @@ impl Bus {
             lock(&self.pending).remove(&id);
             return Err(e);
         }
-        match rx.recv_timeout(REQUEST_TIMEOUT) {
+        match rx.recv_timeout(wait) {
             Ok(f) if f.v["type"] == "error" => Err(format!(
                 "{}: {}",
                 f.v["code"].as_str().unwrap_or("error"),
@@ -580,6 +597,35 @@ impl Bus {
             Ok(body) => self.send(&json!({"op": "reply", "id": id, "call": call, "body": body})),
             Err(m) => self.send(&json!({"op": "reply", "id": id, "call": call, "error": m})),
         }
+    }
+
+    /// Read `<kind>/<source>` or `<kind>/*`; the deliveries arrive on [`Bus::take_msgs`].
+    pub fn subscribe(&self, topic: &str, schema: &str) -> Result<u64, String> {
+        let f = self.request(json!({"op": "subscribe", "topic": topic, "schema": schema}))?;
+        f.v["result"]["sub"]
+            .as_u64()
+            .ok_or_else(|| "subscribe answered without a sub".to_string())
+    }
+
+    /// Call service `<kind>/<source>`; returns the reply body.
+    pub fn call(
+        &self,
+        topic: &str,
+        schema: &str,
+        body: Value,
+        timeout: Duration,
+    ) -> Result<Value, String> {
+        let req = json!({
+            "op": "call", "topic": topic, "schema": schema, "body": body,
+            "timeout_ms": timeout.as_millis() as u64,
+        });
+        self.request_for(req, timeout + Duration::from_secs(2))
+            .map(|f| f.v["result"]["body"].clone())
+    }
+
+    /// The delivered readings of every subscription; available once.
+    pub fn take_msgs(&self) -> Option<Receiver<Msg>> {
+        lock(&self.msgs).take()
     }
 
     /// The pushed-call queue; available once.
@@ -648,7 +694,13 @@ impl Bus {
     }
 }
 
-fn dispatch(f: Frame, pending: &Pending, subs: &Arc<Mutex<Subs>>, calls: &Sender<Call>) {
+fn dispatch(
+    f: Frame,
+    pending: &Pending,
+    subs: &Arc<Mutex<Subs>>,
+    calls: &Sender<Call>,
+    msgs: &Sender<Msg>,
+) {
     match f.v["type"].as_str() {
         Some("ok") | Some("error") => {
             let id = f.v["id"].as_u64().unwrap_or(0);
@@ -661,6 +713,15 @@ fn dispatch(f: Frame, pending: &Pending, subs: &Arc<Mutex<Subs>>, calls: &Sender
                 call: f.v["call"].as_u64().unwrap_or(0),
                 from: f.v["from"].as_str().unwrap_or_default().to_string(),
                 timeout_ms: f.v["timeout_ms"].as_u64().unwrap_or(30_000),
+                body: f.v["body"].clone(),
+            });
+        }
+        Some("msg") => {
+            let _ = msgs.send(Msg {
+                topic: f.v["topic"].as_str().unwrap_or_default().to_string(),
+                source_id: f.v["source_id"].as_str().unwrap_or_default().to_string(),
+                t_ns: f.v["t_ns"].as_u64().unwrap_or(0),
+                seq: f.v["seq"].as_u64().unwrap_or(0),
                 body: f.v["body"].clone(),
             });
         }
@@ -869,6 +930,72 @@ pub mod tests {
             (9, "i", json!({"a": 1}))
         );
         bus.reply(call.call, Ok(json!({"ok": true}))).unwrap();
+        srv.join().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn subscribe_delivers_readings_and_call_returns_the_reply_body() {
+        let dir = std::env::temp_dir().join(format!("cogbus-client-sub-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("b.sock");
+        let l = UnixListener::bind(&path).unwrap();
+        let srv = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            let mut rd = FrameReader::new(s.try_clone().unwrap());
+            let h = rd.next().unwrap().unwrap().v;
+            assert_eq!(h["op"], "hello");
+            write_frame(
+                &mut s,
+                &json!({"type": "ok", "id": 1, "result": {"node_id": "n0"}}),
+            )
+            .unwrap();
+            let sub = rd.next().unwrap().unwrap().v;
+            assert_eq!(
+                (sub["op"].as_str(), sub["topic"].as_str()),
+                (Some("subscribe"), Some("transcript/asr0"))
+            );
+            write_frame(
+                &mut s,
+                &json!({"type": "ok", "id": sub["id"], "result": {"sub": 3}}),
+            )
+            .unwrap();
+            write_frame(&mut s, &json!({"type": "msg", "sub": 3, "topic": "transcript/asr0", "schema": "transcript.v1",
+                "source_id": "asr0", "node_id": "n0", "t_ns": 5, "seq": 1, "recv_ns": 6, "body": {"text": "hi"}})).unwrap();
+            let call = rd.next().unwrap().unwrap().v;
+            assert_eq!(
+                (call["op"].as_str(), call["timeout_ms"].as_u64()),
+                (Some("call"), Some(2000))
+            );
+            write_frame(
+                &mut s,
+                &json!({"type": "ok", "id": call["id"], "result": {"body": {"text": "yo"}}}),
+            )
+            .unwrap();
+        });
+        let bus = Bus::connect(path.to_str().unwrap(), "tok").unwrap();
+        assert_eq!(
+            bus.subscribe("transcript/asr0", "transcript.v1").unwrap(),
+            3
+        );
+        let m = bus
+            .take_msgs()
+            .unwrap()
+            .recv_timeout(Duration::from_secs(2))
+            .unwrap();
+        assert_eq!(
+            (m.source_id.as_str(), m.seq, m.body["text"].clone()),
+            ("asr0", 1, json!("hi"))
+        );
+        let r = bus
+            .call(
+                "svc.infer/venq-npu",
+                "infer.v1",
+                json!({"model": "m"}),
+                Duration::from_secs(2),
+            )
+            .unwrap();
+        assert_eq!(r, json!({"text": "yo"}));
         srv.join().unwrap();
         std::fs::remove_dir_all(&dir).ok();
     }

@@ -1,0 +1,189 @@
+[cog]
+id = "asr"
+name = "Speech Recognition"
+version = "0.1.0"
+category = "ai"
+description = "Hears the microphone stream and publishes what was said. Reads audio.pcm/<source> (the audio-in cog's stream), cuts it into utterances by energy with a learned noise floor, transcribes each with Parakeet TDT 0.6B (int8, CPU) in a sherpa-onnx worker process, and publishes a transcript.v1 reading on transcript/<name>. Empty transcripts are dropped, so a cough is not an event. Fails honestly with no_source when the worker or model cannot start."
+binary = "cog-asr-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/worker.rs: none (runs a model worker process; opens no device and no bus)
+interfaces = ["none"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Listen window (--once)"
+description = "Seconds a single --once run listens for"
+default = 10
+min = 1
+max = 120
+unit = "seconds"
+cli_arg = "--window"
+
+[config.source]
+type = "string"
+label = "Microphone stream"
+description = "Source id of the audio.pcm stream to listen to: audio.pcm/<source>"
+default = "mic0"
+cli_arg = "--source"
+
+[config.name]
+type = "string"
+label = "Name"
+description = "Source id of the transcripts this cog publishes: transcript/<name>"
+default = "asr0"
+cli_arg = "--name"
+
+[config.lang]
+type = "string"
+label = "Language"
+description = "Language tag put on each transcript. The Parakeet v2 model is English."
+default = "en"
+cli_arg = "--lang"
+advanced = true
+
+[config.margin_db]
+type = "integer"
+label = "Speech margin"
+description = "dB above the learned noise floor that counts as speech"
+default = 10
+min = 3
+max = 40
+unit = "dB"
+cli_arg = "--margin-db"
+advanced = true
+
+[config.min_db]
+type = "integer"
+label = "Speech floor"
+description = "Level in dBFS below which nothing counts as speech, whatever the room"
+default = -45
+min = -90
+max = -10
+unit = "dBFS"
+cli_arg = "--min-db"
+advanced = true
+
+[config.hang_ms]
+type = "integer"
+label = "Hangover"
+description = "Quiet that ends an utterance"
+default = 600
+min = 100
+max = 3000
+unit = "ms"
+cli_arg = "--hang-ms"
+advanced = true
+
+[config.min_ms]
+type = "integer"
+label = "Shortest utterance"
+description = "Speech shorter than this is dropped unheard"
+default = 300
+min = 60
+max = 3000
+unit = "ms"
+cli_arg = "--min-ms"
+advanced = true
+
+[config.max_ms]
+type = "integer"
+label = "Longest utterance"
+description = "An utterance running longer is cut here and transcribed"
+default = 15000
+min = 1000
+max = 60000
+unit = "ms"
+cli_arg = "--max-ms"
+advanced = true
+
+[config.threads]
+type = "integer"
+label = "Recognizer threads"
+description = "CPU threads for the recognizer"
+default = 3
+min = 1
+max = 16
+cli_arg = "--threads"
+advanced = true
+
+[config.python]
+type = "string"
+label = "Python"
+description = "Interpreter with sherpa_onnx and numpy installed. Empty: $ASR_PYTHON, else /data/bench/venv/bin/python."
+default = ""
+cli_arg = "--python"
+advanced = true
+
+[config.model_dir]
+type = "string"
+label = "Model directory"
+description = "Directory of the sherpa-onnx Parakeet TDT int8 files (encoder, decoder, joiner, tokens)"
+default = "/data/bench/models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8"
+cli_arg = "--model-dir"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8067"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Run a WAV or raw 16 kHz mono s16le file through the same path instead of listening. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Use two synthetic tone bursts and a recognizer that reports their length (no model), marked SYNTHETIC. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# What this cog reads and publishes. A cog that wants what was said lists, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "transcript"
+#   schema = "transcript.v1"
+#
+# and reads transcript/<name>.
+
+[[inputs]]
+topic = "audio.pcm"
+schema = "pcm.s16le.v1"
+policy = "drop-oldest"
+
+[[outputs]]
+topic = "transcript"
+schema = "transcript.v1"
+class = "reading"
+rate = "one per utterance"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536
