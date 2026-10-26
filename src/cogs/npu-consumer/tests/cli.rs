@@ -48,6 +48,24 @@ fn help_and_simulate_exit_zero() {
             .code(),
         Some(2)
     );
+    // --once alone is the host's run mode, not an error: it needs a broker like any run.
+    let once = Command::new(BIN)
+        .arg("--once")
+        .env_remove("WEFTOS_COGBUS")
+        .output()
+        .unwrap();
+    assert_eq!(once.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&once.stderr).contains("no cogbus"));
+    // --simulate without --once is refused
+    assert_eq!(
+        Command::new(BIN)
+            .arg("--simulate")
+            .output()
+            .unwrap()
+            .status
+            .code(),
+        Some(2)
+    );
 }
 
 #[test]

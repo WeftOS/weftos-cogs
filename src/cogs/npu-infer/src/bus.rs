@@ -60,7 +60,7 @@ pub type Answer = Result<Value, String>;
 type Waiting = Arc<Mutex<HashMap<u64, Sender<Answer>>>>;
 
 pub struct Bus {
-    w: Mutex<UnixStream>,
+    w: Arc<Mutex<UnixStream>>,
     next: AtomicU64,
     waiting: Waiting,
 }
@@ -81,17 +81,30 @@ impl Bus {
         write_frame(&mut w, &json!({"op": "hello", "id": 1, "token": token}))?;
         let first = read_frame(&mut reader)?.ok_or("the broker closed the connection")?;
         if first["type"] != "ok" {
+            // `busy` here is the per-instance connection cap (8): retry later.
             return Err(format!(
-                "hello refused: {}",
+                "hello refused ({}): {}",
+                first["code"].as_str().unwrap_or("?"),
                 first["message"].as_str().unwrap_or("?")
             ));
         }
+        let w = Arc::new(Mutex::new(w));
+        let pong_w = w.clone();
         let waiting: Waiting = Arc::default();
         let (call_tx, calls) = channel();
         let wt = waiting.clone();
         std::thread::spawn(move || {
             while let Ok(Some(f)) = read_frame(&mut reader) {
                 let kind = f["type"].as_str().map(String::from);
+                if kind.as_deref() == Some("ping") {
+                    // Silent while waiting (a provider for calls, a caller on a long one):
+                    // any frame counts as life.
+                    let mut w = pong_w.lock().unwrap_or_else(|p| p.into_inner());
+                    if write_frame(&mut *w, &json!({"op": "pong", "id": 0})).is_err() {
+                        break;
+                    }
+                    continue;
+                }
                 if kind.as_deref() == Some("call") {
                     if call_tx.send(f).is_err() {
                         break;
@@ -127,7 +140,7 @@ impl Bus {
                 .to_string(),
             calls,
             bus: Arc::new(Bus {
-                w: Mutex::new(w),
+                w,
                 next: AtomicU64::new(2),
                 waiting,
             }),
@@ -302,6 +315,49 @@ mod tests {
         assert_eq!(call["call"], 7);
         c.bus.reply(7, Ok(json!({"text": "ok"}))).unwrap();
         c.bus.reply(8, Err("nope".into())).unwrap();
+        h.join().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_ping_is_answered_with_a_pong_while_a_call_still_arrives() {
+        let (path, h, dir) = stand_in("ping", |s| {
+            write_frame(s, &json!({"type": "ping"})).unwrap();
+            let pong = read_frame(s).unwrap().unwrap();
+            assert_eq!(
+                (pong["op"].as_str(), pong["id"].as_u64()),
+                (Some("pong"), Some(0))
+            );
+            write_frame(s, &json!({"type": "call", "call": 3, "body": {}})).unwrap();
+            write_frame(s, &json!({"type": "ping"})).unwrap();
+            assert_eq!(read_frame(s).unwrap().unwrap()["op"], "pong");
+        });
+        let c = Bus::connect(&path, "tok").unwrap();
+        assert_eq!(
+            c.calls.recv_timeout(Duration::from_secs(2)).unwrap()["call"],
+            3
+        );
+        h.join().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_refused_hello_keeps_the_brokers_code_so_busy_is_visible() {
+        let dir = std::env::temp_dir().join(format!("npu-infer-bus-busy-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("b.sock");
+        let l = UnixListener::bind(&path).unwrap();
+        let h = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            read_frame(&mut s).unwrap().unwrap();
+            write_frame(
+                &mut s,
+                &json!({"type": "error", "id": 1, "code": "busy", "message": "8 connections"}),
+            )
+            .unwrap();
+        });
+        let e = Bus::connect(path.to_str().unwrap(), "tok").err().unwrap();
+        assert!(e.contains("(busy)") && e.contains("8 connections"), "{e}");
         h.join().unwrap();
         std::fs::remove_dir_all(&dir).ok();
     }

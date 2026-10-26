@@ -32,7 +32,7 @@ const HELP: &str = "cog-npu-consumer: calls the node's NPU inference service and
 
   --service NAME       service name, calls svc.infer/NAME (venq-npu)
   --bus PATH           broker socket (default $WEFTOS_COGBUS); token from $WEFTOS_COGBUS_TOKEN
-  --models A,B,...     aliases to cycle through, one per call (gemma3-1b)
+  --models A,B,...     aliases to cycle through, one per call (gemma3-1b); `+` also separates
   --priority N         0..=9 (4)
   --max-tokens N       tokens per call (24)
   --text TEXT          the prompt
@@ -89,7 +89,8 @@ fn num<T: std::str::FromStr + PartialOrd + Copy>(a: &[String], f: &str, d: T, lo
 fn parse_opts(a: &[String]) -> Opts {
     let models: Vec<String> = arg(a, "--models")
         .unwrap_or("gemma3-1b")
-        .split(',')
+        // `+` as well as `,`: placement values may not contain a comma.
+        .split([',', '+'])
         .map(|m| m.trim().to_string())
         .filter(|m| !m.is_empty())
         .collect();
@@ -334,10 +335,12 @@ fn main() {
         );
         return;
     }
-    if o.once || o.simulate {
-        eprintln!("{TAG} --once and --simulate go together; see --help");
+    if o.simulate {
+        eprintln!("{TAG} --simulate runs only with --once; see --help");
         std::process::exit(2);
     }
+    // A bare --once is the host's run-to-completion mode: run as configured and
+    // exit when --calls or --duration-secs is reached.
     std::process::exit(run(&o));
 }
 
@@ -369,6 +372,11 @@ mod tests {
             .collect();
         let o = parse_opts(&a);
         assert_eq!(o.models, ["a", "b", "c"]);
+        let plus: Vec<String> = ["--models", "gemma3-1b+qwen3-4b"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert_eq!(parse_opts(&plus).models, ["gemma3-1b", "qwen3-4b"]);
         assert_eq!(
             (o.priority, o.calls),
             (4, 5),

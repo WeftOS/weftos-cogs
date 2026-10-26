@@ -56,7 +56,7 @@ pub enum Answer {
 type Waiting = Arc<Mutex<HashMap<u64, Sender<Answer>>>>;
 
 pub struct Bus {
-    w: Mutex<UnixStream>,
+    w: Arc<Mutex<UnixStream>>,
     next: AtomicU64,
     waiting: Waiting,
 }
@@ -71,17 +71,28 @@ impl Bus {
         write_frame(&mut w, &json!({"op": "hello", "id": 1, "token": token}))?;
         let first = read_frame(&mut reader)?.ok_or("the broker closed the connection")?;
         if first["type"] != "ok" {
+            // `busy` here is the per-instance connection cap (8): retry later.
             return Err(format!(
-                "hello refused: {}",
+                "hello refused ({}): {}",
+                first["code"].as_str().unwrap_or("?"),
                 first["message"].as_str().unwrap_or("?")
             ));
         }
+        let w = Arc::new(Mutex::new(w));
+        let pong_w = w.clone();
         let waiting: Waiting = Arc::default();
         let (msg_tx, msg_rx) = channel();
         let wt = waiting.clone();
         std::thread::spawn(move || {
             while let Ok(Some(f)) = read_frame(&mut reader) {
                 match f["type"].as_str() {
+                    Some("ping") => {
+                        // Silent while waiting on a long call: any frame counts as life.
+                        let mut w = pong_w.lock().unwrap_or_else(|p| p.into_inner());
+                        if write_frame(&mut *w, &json!({"op": "pong", "id": 0})).is_err() {
+                            break;
+                        }
+                    }
                     Some("ok") | Some("error") => {
                         let id = f["id"].as_u64().unwrap_or(0);
                         let a = if f["type"] == "ok" {
@@ -109,7 +120,7 @@ impl Bus {
         });
         Ok((
             Arc::new(Bus {
-                w: Mutex::new(w),
+                w,
                 next: AtomicU64::new(2),
                 waiting,
             }),
@@ -171,6 +182,39 @@ impl Bus {
 mod tests {
     use super::*;
     use std::os::unix::net::UnixListener;
+
+    #[test]
+    fn a_ping_is_answered_with_a_pong_while_a_call_waits() {
+        let dir =
+            std::env::temp_dir().join(format!("npu-consumer-bus-ping-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("b.sock");
+        let l = UnixListener::bind(&path).unwrap();
+        let h = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            read_frame(&mut s).unwrap().unwrap();
+            write_frame(&mut s, &json!({"type": "ok", "id": 1, "result": {}})).unwrap();
+            let call = read_frame(&mut s).unwrap().unwrap();
+            write_frame(&mut s, &json!({"type": "ping"})).unwrap();
+            let pong = read_frame(&mut s).unwrap().unwrap();
+            assert_eq!(
+                (pong["op"].as_str(), pong["id"].as_u64()),
+                (Some("pong"), Some(0))
+            );
+            write_frame(
+                &mut s,
+                &json!({"type": "ok", "id": call["id"], "result": {"body": {"text": "late"}}}),
+            )
+            .unwrap();
+        });
+        let (bus, _rx) = Bus::connect(path.to_str().unwrap(), "t").unwrap();
+        assert_eq!(
+            bus.call("svc.infer/venq-npu", json!({}), Duration::from_secs(5)),
+            Answer::Ok(json!({"text": "late"}))
+        );
+        h.join().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
 
     #[test]
     fn a_call_waits_for_its_own_reply_and_a_refusal_is_reported() {
