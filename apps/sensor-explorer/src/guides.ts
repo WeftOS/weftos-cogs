@@ -7,9 +7,11 @@ import ld1040c from "../../../crates/cog-market/catalog/guides/ld1040c-motion.js
 import ld2450 from "../../../crates/cog-market/catalog/guides/ld2450-radar.json";
 import mentraLive from "../../../crates/cog-market/catalog/guides/mentra-live.json";
 import rd03e from "../../../crates/cog-market/catalog/guides/rd-03e.json";
+import sdrPlutoRx from "../../../crates/cog-market/catalog/guides/sdr-pluto-rx.json";
 import sen0213 from "../../../crates/cog-market/catalog/guides/sen0213-ecg.json";
 import sen0628 from "../../../crates/cog-market/catalog/guides/sen0628-tof.json";
 import soundDetect from "../../../crates/cog-market/catalog/guides/sound-detect.json";
+import spectrum from "../../../crates/cog-market/catalog/guides/spectrum.json";
 
 export const GUIDES: Record<string, unknown> = {
   bridge: bridge as unknown,
@@ -18,9 +20,11 @@ export const GUIDES: Record<string, unknown> = {
   "ld2450-radar": ld2450 as unknown,
   "mentra-live": mentraLive as unknown,
   "rd-03e": rd03e as unknown,
+  "sdr-pluto-rx": sdrPlutoRx as unknown,
   "sen0213-ecg": sen0213 as unknown,
   "sen0628-tof": sen0628 as unknown,
   "sound-detect": soundDetect as unknown,
+  spectrum: spectrum as unknown,
 };
 
 export function guideFor(id: string): unknown | null {

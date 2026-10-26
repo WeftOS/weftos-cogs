@@ -1,0 +1,42 @@
+# Sensor guide for spectrum (WeftOS ADR-104 sensor-guide format, schema 1).
+# The cog reads another cog's IQ stream, so there is no wiring: the only diagram is the signal flow.
+
+schema = 1
+title = "Spectrum and band occupancy from the PlutoSDR stream"
+sensor = "iq.cs16.v1 stream from the sdr-pluto-rx cog (PlutoSDR Nano)"
+cog = "spectrum"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "readings", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+owner_running = "setup"
+cog_installed = "setup"
+cog_running = "setup"
+export = "setup"
+spectrum = "readings"
+occupancy = "readings"
+loss = "troubleshoot"
+no_source = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "sdr-pluto-rx"
+detail = "iq.cs16.v1 ring, loss counted"
+
+[[flow]]
+name = "Welch FFT"
+detail = "1024 points, Hann, 50% overlap"
+
+[[flow]]
+name = "Noise floor"
+detail = "median bin per frame, +10 dB = busy"
+
+[[flow]]
+name = "spectrum cog"
+detail = "PSD each window, occupancy each minute"
+
+[[flow]]
+name = "Outputs"
+detail = "spectrum.psd, band.occupancy, :8064"

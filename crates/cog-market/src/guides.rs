@@ -14,9 +14,11 @@ pub const GUIDES: &[(&str, &str)] = &[
     ("ld2450-radar", include_str!("../catalog/guides/ld2450-radar.json")),
     ("mentra-live", include_str!("../catalog/guides/mentra-live.json")),
     ("rd-03e", include_str!("../catalog/guides/rd-03e.json")),
+    ("sdr-pluto-rx", include_str!("../catalog/guides/sdr-pluto-rx.json")),
     ("sen0213-ecg", include_str!("../catalog/guides/sen0213-ecg.json")),
     ("sen0628-tof", include_str!("../catalog/guides/sen0628-tof.json")),
     ("sound-detect", include_str!("../catalog/guides/sound-detect.json")),
+    ("spectrum", include_str!("../catalog/guides/spectrum.json")),
 ];
 
 /// The bundled guide JSON for a cog, if one ships with the catalog.
