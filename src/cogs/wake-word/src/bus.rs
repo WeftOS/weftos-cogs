@@ -416,6 +416,30 @@ impl RingReader {
     }
 }
 
+/// Standard base64 with padding.
+pub fn b64(data: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for c in data.chunks(3) {
+        let n = (c[0] as u32) << 16
+            | (*c.get(1).unwrap_or(&0) as u32) << 8
+            | *c.get(2).unwrap_or(&0) as u32;
+        out.push(T[(n >> 18) as usize & 63] as char);
+        out.push(T[(n >> 12) as usize & 63] as char);
+        out.push(if c.len() > 1 {
+            T[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        out.push(if c.len() > 2 {
+            T[n as usize & 63] as char
+        } else {
+            '='
+        });
+    }
+    out
+}
+
 pub fn wall_ns() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -464,8 +488,28 @@ struct Subs {
     orphans: HashMap<u64, Orphan>,
 }
 
+/// How long to wait before connecting again after `err`: longer when the broker is full
+/// (`busy`: 8 connections per instance, 64 subscriptions per connection), so a retry loop
+/// does not keep knocking.
+pub fn retry_after(err: &str) -> Duration {
+    if err.contains("busy") {
+        Duration::from_secs(10)
+    } else {
+        Duration::from_secs(2)
+    }
+}
+
+impl Drop for Bus {
+    /// Close the socket, which ends the reader thread. A `Bus` dropped after a failed setup
+    /// (say a refused subscribe) must not keep its connection, or it would count against the
+    /// instance's cap.
+    fn drop(&mut self) {
+        let _ = lock(&self.w).shutdown(std::net::Shutdown::Both);
+    }
+}
+
 pub struct Bus {
-    w: Mutex<UnixStream>,
+    w: Arc<Mutex<UnixStream>>,
     next: AtomicU64,
     pending: Pending,
     calls: Mutex<Option<Receiver<Call>>>,
@@ -492,7 +536,8 @@ impl Bus {
         let first = reader.next()?.ok_or("the broker closed the connection")?;
         if first.v["type"] != "ok" {
             return Err(format!(
-                "hello refused: {}",
+                "hello refused: {}: {}",
+                first.v["code"].as_str().unwrap_or("error"),
                 first.v["message"].as_str().unwrap_or("?")
             ));
         }
@@ -505,16 +550,23 @@ impl Bus {
         let closed = Arc::new(AtomicBool::new(false));
         let (ctx, crx) = channel();
         let (mtx, mrx) = channel();
-        let (p2, s2, c2) = (pending.clone(), subs.clone(), closed.clone());
+        let w = Arc::new(Mutex::new(w));
+        let (p2, s2, c2, w2) = (pending.clone(), subs.clone(), closed.clone(), w.clone());
         std::thread::spawn(move || {
             while let Ok(Some(f)) = reader.next() {
+                // After 60 s of silence the broker pings and closes the connection 15 s later
+                // unless something comes back (ADR-122 gap 4): answer at once, off the dispatch.
+                if f.v["type"] == "ping" {
+                    let _ = write_frame(&mut *lock(&w2), &json!({"op": "pong", "id": 0}));
+                    continue;
+                }
                 dispatch(f, &p2, &s2, &ctx, &mtx);
             }
             c2.store(true, Ordering::Release);
             lock(&p2).clear();
         });
         Ok(Bus {
-            w: Mutex::new(w),
+            w,
             next: AtomicU64::new(2),
             pending,
             calls: Mutex::new(Some(crx)),
@@ -597,6 +649,40 @@ impl Bus {
             Ok(body) => self.send(&json!({"op": "reply", "id": id, "call": call, "body": body})),
             Err(m) => self.send(&json!({"op": "reply", "id": id, "call": call, "error": m})),
         }
+    }
+
+    /// Put `data` in the node's blob store (WeftOS ADR-122 section 13) and return its
+    /// `blob.v1` handle. The cog needs an `[[outputs]]` entry of class `blob`.
+    pub fn put_blob(&self, media_type: &str, data: &[u8], ttl: Duration) -> Result<Value, String> {
+        if data.is_empty() {
+            return Err("a blob needs at least one byte".into());
+        }
+        let f = self.request(json!({
+            "op": "blob_begin", "media_type": media_type, "size": data.len(),
+            "ttl_ms": ttl.as_millis() as u64,
+        }))?;
+        let upload = f.v["result"]["upload"]
+            .as_u64()
+            .ok_or("blob_begin answered without an upload")?;
+        let step =
+            (f.v["result"]["chunk"].as_u64().unwrap_or(32 * 1024) as usize).clamp(1024, 32 * 1024);
+        let total = data.len().div_ceil(step);
+        for (i, c) in data.chunks(step).enumerate() {
+            let last = i + 1 == total;
+            let r = self.request(json!({
+                "op": "blob_chunk", "upload": upload, "offset": i * step, "data": b64(c), "last": last,
+            }))?;
+            if last {
+                return Ok(r.v["result"]["handle"].clone()).and_then(|h| {
+                    if h.is_object() {
+                        Ok(h)
+                    } else {
+                        Err("the last chunk answered without a handle".to_string())
+                    }
+                });
+            }
+        }
+        Err("empty upload".into())
     }
 
     /// Read `<kind>/<source>` or `<kind>/*`; the deliveries arrive on [`Bus::take_msgs`].
@@ -996,6 +1082,160 @@ pub mod tests {
             )
             .unwrap();
         assert_eq!(r, json!({"text": "yo"}));
+        srv.join().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_blob_goes_up_in_slices_and_the_handle_comes_back() {
+        let dir = std::env::temp_dir().join(format!("cogbus-client-blob-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("b.sock");
+        let l = UnixListener::bind(&path).unwrap();
+        let data: Vec<u8> = (0..70_000u32).map(|i| (i % 251) as u8).collect();
+        let want = data.clone();
+        let srv = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            let mut rd = FrameReader::new(s.try_clone().unwrap());
+            let _hello = rd.next().unwrap().unwrap();
+            write_frame(
+                &mut s,
+                &json!({"type": "ok", "id": 1, "result": {"node_id": "n0"}}),
+            )
+            .unwrap();
+            let b = rd.next().unwrap().unwrap().v;
+            assert_eq!(
+                (
+                    b["op"].as_str(),
+                    b["size"].as_u64(),
+                    b["media_type"].as_str()
+                ),
+                (Some("blob_begin"), Some(70_000), Some("image/jpeg"))
+            );
+            write_frame(
+                &mut s,
+                &json!({"type": "ok", "id": b["id"], "result": {"upload": 4, "chunk": 32768}}),
+            )
+            .unwrap();
+            let mut got = Vec::new();
+            loop {
+                let c = rd.next().unwrap().unwrap().v;
+                assert_eq!(
+                    (c["op"].as_str(), c["upload"].as_u64(), c["offset"].as_u64()),
+                    (Some("blob_chunk"), Some(4), Some(got.len() as u64))
+                );
+                let raw = c["data"].as_str().unwrap();
+                got.extend(unb64(raw));
+                if c["last"] == true {
+                    assert_eq!(got, want);
+                    write_frame(&mut s, &json!({"type": "ok", "id": c["id"], "result": {"handle": {"hash": "ab", "size": 70000, "media_type": "image/jpeg", "expires_ms": 9}}})).unwrap();
+                    return;
+                }
+                write_frame(&mut s, &json!({"type": "ok", "id": c["id"], "result": {}})).unwrap();
+            }
+        });
+        let bus = Bus::connect(path.to_str().unwrap(), "tok").unwrap();
+        let h = bus
+            .put_blob("image/jpeg", &data, Duration::from_secs(10))
+            .unwrap();
+        assert_eq!(
+            (h["size"].as_u64(), h["media_type"].as_str()),
+            (Some(70_000), Some("image/jpeg"))
+        );
+        assert!(bus
+            .put_blob("image/jpeg", &[], Duration::from_secs(1))
+            .is_err());
+        srv.join().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    fn unb64(s: &str) -> Vec<u8> {
+        let v = |c: u8| match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            _ => 63,
+        };
+        let b = s.as_bytes();
+        let mut out = Vec::new();
+        for q in b.chunks(4) {
+            let n = q
+                .iter()
+                .take_while(|c| **c != b'=')
+                .fold(0u32, |a, c| a << 6 | v(*c) as u32)
+                << (6 * (4 - q.iter().take_while(|c| **c != b'=').count()));
+            let k = q.iter().take_while(|c| **c != b'=').count() * 6 / 8;
+            out.extend_from_slice(&n.to_be_bytes()[1..1 + k]);
+        }
+        out
+    }
+
+    #[test]
+    fn base64_matches_known_vectors() {
+        for (i, o) in [
+            ("", ""),
+            ("f", "Zg=="),
+            ("fo", "Zm8="),
+            ("foo", "Zm9v"),
+            ("foobar", "Zm9vYmFy"),
+        ] {
+            assert_eq!(b64(i.as_bytes()), o);
+            assert_eq!(unb64(o), i.as_bytes());
+        }
+    }
+
+    #[test]
+    fn a_ping_is_answered_and_a_dropped_bus_closes_its_connection() {
+        let dir = std::env::temp_dir().join(format!("cogbus-client-ping-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("b.sock");
+        let l = UnixListener::bind(&path).unwrap();
+        let srv = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            let mut rd = FrameReader::new(s.try_clone().unwrap());
+            let _hello = rd.next().unwrap().unwrap();
+            write_frame(
+                &mut s,
+                &json!({"type": "ok", "id": 1, "result": {"node_id": "n0"}}),
+            )
+            .unwrap();
+            write_frame(&mut s, &json!({"type": "ping"})).unwrap();
+            let pong = rd.next().unwrap().unwrap().v;
+            assert_eq!(
+                (pong["op"].as_str(), pong["id"].as_u64()),
+                (Some("pong"), Some(0))
+            );
+            // The client is dropped now: the connection ends instead of lingering.
+            assert!(
+                rd.next().unwrap().is_none(),
+                "the dropped bus must close its socket"
+            );
+        });
+        let bus = Bus::connect(path.to_str().unwrap(), "tok").unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(!bus.is_closed());
+        drop(bus);
+        srv.join().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn busy_is_kept_in_the_error_and_backs_off_longer() {
+        let dir = std::env::temp_dir().join(format!("cogbus-client-busy-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("b.sock");
+        let l = UnixListener::bind(&path).unwrap();
+        let srv = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            let mut rd = FrameReader::new(s.try_clone().unwrap());
+            let _hello = rd.next().unwrap().unwrap();
+            write_frame(&mut s, &json!({"type": "error", "id": 1, "code": "busy", "message": "8 connections is the most one instance may hold"})).unwrap();
+        });
+        let e = Bus::connect(path.to_str().unwrap(), "tok").err().unwrap();
+        assert!(e.contains("busy") && e.contains("8 connections"), "{e}");
+        assert_eq!(retry_after(&e), Duration::from_secs(10));
+        assert_eq!(retry_after("connect x: refused"), Duration::from_secs(2));
         srv.join().unwrap();
         std::fs::remove_dir_all(&dir).ok();
     }

@@ -345,6 +345,8 @@ struct Link {
     state: BusState,
     seq_t: u64,
     last_try: Option<Instant>,
+    /// Wait before the next connect attempt (longer after `busy`).
+    retry: Duration,
 }
 
 impl Link {
@@ -357,6 +359,7 @@ impl Link {
             state: BusState::default(),
             seq_t: 0,
             last_try: None,
+            retry: Duration::from_secs(2),
         }
     }
 
@@ -369,11 +372,7 @@ impl Link {
             self.writer = None;
             self.state.connected = false;
         }
-        if self.writer.is_some()
-            || self
-                .last_try
-                .is_some_and(|t| t.elapsed() < Duration::from_secs(2))
-        {
+        if self.writer.is_some() || self.last_try.is_some_and(|t| t.elapsed() < self.retry) {
             return;
         }
         self.last_try = Some(Instant::now());
@@ -398,6 +397,7 @@ impl Link {
                 self.writer = Some(w);
             }
             Err(e) => {
+                self.retry = bus::retry_after(&e);
                 self.state.error = Some(e.clone());
                 eprintln!("{TAG} bus: {e}");
             }

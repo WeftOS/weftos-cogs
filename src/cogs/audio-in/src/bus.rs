@@ -488,8 +488,28 @@ struct Subs {
     orphans: HashMap<u64, Orphan>,
 }
 
+/// How long to wait before connecting again after `err`: longer when the broker is full
+/// (`busy`: 8 connections per instance, 64 subscriptions per connection), so a retry loop
+/// does not keep knocking.
+pub fn retry_after(err: &str) -> Duration {
+    if err.contains("busy") {
+        Duration::from_secs(10)
+    } else {
+        Duration::from_secs(2)
+    }
+}
+
+impl Drop for Bus {
+    /// Close the socket, which ends the reader thread. A `Bus` dropped after a failed setup
+    /// (say a refused subscribe) must not keep its connection, or it would count against the
+    /// instance's cap.
+    fn drop(&mut self) {
+        let _ = lock(&self.w).shutdown(std::net::Shutdown::Both);
+    }
+}
+
 pub struct Bus {
-    w: Mutex<UnixStream>,
+    w: Arc<Mutex<UnixStream>>,
     next: AtomicU64,
     pending: Pending,
     calls: Mutex<Option<Receiver<Call>>>,
@@ -516,7 +536,8 @@ impl Bus {
         let first = reader.next()?.ok_or("the broker closed the connection")?;
         if first.v["type"] != "ok" {
             return Err(format!(
-                "hello refused: {}",
+                "hello refused: {}: {}",
+                first.v["code"].as_str().unwrap_or("error"),
                 first.v["message"].as_str().unwrap_or("?")
             ));
         }
@@ -529,16 +550,23 @@ impl Bus {
         let closed = Arc::new(AtomicBool::new(false));
         let (ctx, crx) = channel();
         let (mtx, mrx) = channel();
-        let (p2, s2, c2) = (pending.clone(), subs.clone(), closed.clone());
+        let w = Arc::new(Mutex::new(w));
+        let (p2, s2, c2, w2) = (pending.clone(), subs.clone(), closed.clone(), w.clone());
         std::thread::spawn(move || {
             while let Ok(Some(f)) = reader.next() {
+                // After 60 s of silence the broker pings and closes the connection 15 s later
+                // unless something comes back (ADR-122 gap 4): answer at once, off the dispatch.
+                if f.v["type"] == "ping" {
+                    let _ = write_frame(&mut *lock(&w2), &json!({"op": "pong", "id": 0}));
+                    continue;
+                }
                 dispatch(f, &p2, &s2, &ctx, &mtx);
             }
             c2.store(true, Ordering::Release);
             lock(&p2).clear();
         });
         Ok(Bus {
-            w: Mutex::new(w),
+            w,
             next: AtomicU64::new(2),
             pending,
             calls: Mutex::new(Some(crx)),
@@ -1155,6 +1183,61 @@ pub mod tests {
             assert_eq!(b64(i.as_bytes()), o);
             assert_eq!(unb64(o), i.as_bytes());
         }
+    }
+
+    #[test]
+    fn a_ping_is_answered_and_a_dropped_bus_closes_its_connection() {
+        let dir = std::env::temp_dir().join(format!("cogbus-client-ping-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("b.sock");
+        let l = UnixListener::bind(&path).unwrap();
+        let srv = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            let mut rd = FrameReader::new(s.try_clone().unwrap());
+            let _hello = rd.next().unwrap().unwrap();
+            write_frame(
+                &mut s,
+                &json!({"type": "ok", "id": 1, "result": {"node_id": "n0"}}),
+            )
+            .unwrap();
+            write_frame(&mut s, &json!({"type": "ping"})).unwrap();
+            let pong = rd.next().unwrap().unwrap().v;
+            assert_eq!(
+                (pong["op"].as_str(), pong["id"].as_u64()),
+                (Some("pong"), Some(0))
+            );
+            // The client is dropped now: the connection ends instead of lingering.
+            assert!(
+                rd.next().unwrap().is_none(),
+                "the dropped bus must close its socket"
+            );
+        });
+        let bus = Bus::connect(path.to_str().unwrap(), "tok").unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(!bus.is_closed());
+        drop(bus);
+        srv.join().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn busy_is_kept_in_the_error_and_backs_off_longer() {
+        let dir = std::env::temp_dir().join(format!("cogbus-client-busy-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("b.sock");
+        let l = UnixListener::bind(&path).unwrap();
+        let srv = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            let mut rd = FrameReader::new(s.try_clone().unwrap());
+            let _hello = rd.next().unwrap().unwrap();
+            write_frame(&mut s, &json!({"type": "error", "id": 1, "code": "busy", "message": "8 connections is the most one instance may hold"})).unwrap();
+        });
+        let e = Bus::connect(path.to_str().unwrap(), "tok").err().unwrap();
+        assert!(e.contains("busy") && e.contains("8 connections"), "{e}");
+        assert_eq!(retry_after(&e), Duration::from_secs(10));
+        assert_eq!(retry_after("connect x: refused"), Duration::from_secs(2));
+        srv.join().unwrap();
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
