@@ -106,8 +106,9 @@ fi
 step 10 "every cog has one non-redirect ADR, and decision ids are unique"
 for c in ${cogs[@]+"${cogs[@]}"}; do
   found=()
-  for f in docs/adrs/ADR-*"$c"*.md; do
-    [ -f "$f" ] || continue
+  for f in docs/adrs/ADR-*.md; do
+    # ADR-<number>-<cog>.md exactly: "bridge" must not claim mcu-bridge's ADR.
+    [[ "$(basename "$f")" =~ ^ADR-[0-9]+-"$c"\.md$ ]] || continue
     if head -n 1 "$f" | grep -q '^# Redirect'; then
       continue
     fi
