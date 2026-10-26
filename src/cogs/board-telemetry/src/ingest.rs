@@ -158,6 +158,31 @@ mod tests {
     use super::*;
     use std::net::TcpListener;
 
+    /// Read one whole request: the client may send the head and the body in separate writes.
+    fn read_request(c: &mut std::net::TcpStream) -> String {
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 1024];
+        loop {
+            let n = c.read(&mut chunk).unwrap();
+            buf.extend_from_slice(&chunk[..n]);
+            let text = String::from_utf8_lossy(&buf);
+            if let Some(head_end) = text.find("\r\n\r\n") {
+                let want = text[..head_end]
+                    .lines()
+                    .find_map(|l| l.strip_prefix("Content-Length: "))
+                    .and_then(|v| v.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                if buf.len() >= head_end + 4 + want {
+                    break;
+                }
+            }
+            if n == 0 {
+                break;
+            }
+        }
+        String::from_utf8_lossy(&buf).into_owned()
+    }
+
     #[test]
     fn unset_or_empty_env_uses_port_80() {
         for v in [None, Some(""), Some("  ")] {
@@ -213,11 +238,10 @@ mod tests {
         let port = l.local_addr().unwrap().port();
         let server = std::thread::spawn(move || {
             let (mut c, _) = l.accept().unwrap();
-            let mut buf = vec![0u8; 4096];
-            let n = c.read(&mut buf).unwrap();
+            let req = read_request(&mut c);
             c.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
                 .unwrap();
-            String::from_utf8_lossy(&buf[..n]).into_owned()
+            req
         });
         let (t, _) = target_from_env(Some(&format!("http://127.0.0.1:{port}")));
         store_to_seed(
@@ -241,11 +265,10 @@ mod tests {
         let port = l.local_addr().unwrap().port();
         let server = std::thread::spawn(move || {
             let (mut c, _) = l.accept().unwrap();
-            let mut buf = vec![0u8; 4096];
-            let n = c.read(&mut buf).unwrap();
+            let req = read_request(&mut c);
             c.write_all(b"HTTP/1.1 503 X\r\nContent-Length: 0\r\n\r\n")
                 .unwrap();
-            String::from_utf8_lossy(&buf[..n]).into_owned()
+            req
         });
         let t = Target {
             port,
