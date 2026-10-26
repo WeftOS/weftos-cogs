@@ -1,0 +1,95 @@
+[cog]
+id = "npu-consumer"
+name = "NPU Consumer"
+version = "0.1.0"
+category = "industrial"
+description = "A test consumer for the NPU inference service. Calls svc.infer on the node's cogbus with a cycle of models, one call at a time, and logs every call (model, priority, total, queue, load and run milliseconds, whether it had to load, errors) as JSON lines; with watch on it also logs the service's telemetry. Two instances with different model lists are the two-consumer acceptance run and soak. A tool for acceptance runs, not something a node needs."
+binary = "cog-npu-consumer-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/bus.rs: none (a cogbus client; opens no device)
+interfaces = ["none"]
+
+[config]
+
+[config.models]
+type = "string"
+label = "Models"
+description = "Comma-separated model aliases, called in turn"
+default = "gemma3-1b"
+cli_arg = "--models"
+
+[config.priority]
+type = "integer"
+label = "Priority"
+description = "0 (background) to 9 (interactive)"
+default = 4
+min = 0
+max = 9
+cli_arg = "--priority"
+
+[config.role]
+type = "string"
+label = "Role"
+description = "Label for this instance in the log"
+default = "consumer"
+cli_arg = "--role"
+
+[config.log]
+type = "string"
+label = "Log file"
+description = "Append JSON lines here (also printed)"
+default = ""
+cli_arg = "--log"
+advanced = true
+
+[config.duration_secs]
+type = "integer"
+label = "Duration"
+description = "Stop after this many seconds; 0 runs until stopped"
+default = 0
+min = 0
+max = 10000000
+unit = "seconds"
+cli_arg = "--duration-secs"
+advanced = true
+
+[config.pause_ms]
+type = "integer"
+label = "Pause between calls"
+description = "Milliseconds to wait after each call"
+default = 0
+min = 0
+max = 3600000
+unit = "ms"
+cli_arg = "--pause-ms"
+advanced = true
+
+[config.watch]
+type = "boolean"
+label = "Log service telemetry"
+description = "Also log the NPU service's telemetry every few seconds"
+default = false
+cli_arg = "--watch"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "With --once: print one synthetic line, make no call"
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# Calls the NPU service (svc.infer, infer.v1) and optionally reads its telemetry.
+[[inputs]]
+topic = "svc.infer"
+schema = "infer.v1"
+
+[[inputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536
