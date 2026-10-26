@@ -67,14 +67,23 @@ pub fn example_calib() -> Calib {
 }
 
 pub fn example_raw() -> Raw {
-    Raw { temperature: 519888, pressure: 415148, humidity: 22636 }
+    Raw {
+        temperature: 519888,
+        pressure: 415148,
+        humidity: 22636,
+    }
 }
 
 pub fn compensate(cal: &mut Calib, raw: Raw) -> Compensated {
     let temp_centi = compensate_temperature(cal, raw.temperature);
     let pressure_centi_pa = compensate_pressure(cal, raw.pressure);
     let humidity_q22_10 = compensate_humidity(cal, raw.humidity);
-    Compensated { t_fine: cal.t_fine, temp_centi, pressure_centi_pa, humidity_q22_10 }
+    Compensated {
+        t_fine: cal.t_fine,
+        temp_centi,
+        pressure_centi_pa,
+        humidity_q22_10,
+    }
 }
 
 fn compensate_temperature(cal: &mut Calib, adc: u32) -> i32 {

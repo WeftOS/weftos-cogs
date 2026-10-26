@@ -44,7 +44,10 @@ mod linux {
         // SAFETY: plain ioctl on an owned, open fd; the argument is the 7-bit address.
         let rc = unsafe { libc::ioctl(fd.0, I2C_SLAVE as _, libc::c_ulong::from(addr)) };
         if rc < 0 {
-            return Err(format!("I2C address 0x{addr:02x} was refused ({})", std::io::Error::last_os_error()));
+            return Err(format!(
+                "I2C address 0x{addr:02x} was refused ({})",
+                std::io::Error::last_os_error()
+            ));
         }
         let id = read_reg(&fd, REG_CHIP_ID, 1)?;
         if !chip_is_bme280(id[0]) {
@@ -65,14 +68,20 @@ mod linux {
         tp_a.copy_from_slice(&tp);
         let mut hum_a = [0u8; 7];
         hum_a.copy_from_slice(&hum);
-        Ok(Sample { raw: parse_burst(&burst), cal: parse_calib(&tp_a, &hum_a) })
+        Ok(Sample {
+            raw: parse_burst(&burst),
+            cal: parse_calib(&tp_a, &hum_a),
+        })
     }
 
     fn write_reg(fd: &Fd, reg: u8, value: u8) -> Result<(), String> {
         let buf = [reg, value];
         let n = unsafe { libc::write(fd.0, buf.as_ptr().cast(), buf.len()) };
         if n != buf.len() as isize {
-            return Err(format!("I2C write of 0x{reg:02x} failed ({})", std::io::Error::last_os_error()));
+            return Err(format!(
+                "I2C write of 0x{reg:02x} failed ({})",
+                std::io::Error::last_os_error()
+            ));
         }
         Ok(())
     }
@@ -80,12 +89,18 @@ mod linux {
     fn read_reg(fd: &Fd, reg: u8, len: usize) -> Result<Vec<u8>, String> {
         let n = unsafe { libc::write(fd.0, [reg].as_ptr().cast(), 1) };
         if n != 1 {
-            return Err(format!("I2C address write of 0x{reg:02x} failed ({})", std::io::Error::last_os_error()));
+            return Err(format!(
+                "I2C address write of 0x{reg:02x} failed ({})",
+                std::io::Error::last_os_error()
+            ));
         }
         let mut buf = vec![0u8; len];
         let n = unsafe { libc::read(fd.0, buf.as_mut_ptr().cast(), len) };
         if n != len as isize {
-            return Err(format!("I2C read of 0x{reg:02x} returned {n} bytes ({})", std::io::Error::last_os_error()));
+            return Err(format!(
+                "I2C read of 0x{reg:02x} returned {n} bytes ({})",
+                std::io::Error::last_os_error()
+            ));
         }
         Ok(buf)
     }

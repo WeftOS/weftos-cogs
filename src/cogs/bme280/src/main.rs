@@ -26,7 +26,10 @@ struct Opts {
 }
 
 fn arg<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
-    args.iter().position(|s| s == flag).and_then(|i| args.get(i + 1)).map(String::as_str)
+    args.iter()
+        .position(|s| s == flag)
+        .and_then(|i| args.get(i + 1))
+        .map(String::as_str)
 }
 
 fn num(args: &[String], flag: &str, default: u64, lo: u64, hi: u64) -> u64 {
@@ -95,9 +98,21 @@ fn line_json(line: &Line) -> String {
         ),
         None => ("null".into(), "null".into(), "null".into()),
     };
-    let temp = if line.reading.is_some() { format!("\"{temp}\"") } else { temp };
-    let press = if line.reading.is_some() { format!("\"{press}\"") } else { press };
-    let hum = if line.reading.is_some() { format!("\"{hum}\"") } else { hum };
+    let temp = if line.reading.is_some() {
+        format!("\"{temp}\"")
+    } else {
+        temp
+    };
+    let press = if line.reading.is_some() {
+        format!("\"{press}\"")
+    } else {
+        press
+    };
+    let hum = if line.reading.is_some() {
+        format!("\"{hum}\"")
+    } else {
+        hum
+    };
     let provenance = match line.provenance {
         Some(p) => format!("\"{p}\""),
         None => "null".into(),
@@ -115,7 +130,12 @@ fn line_json(line: &Line) -> String {
 fn simulate_line() -> Line {
     let (raw, mut cal) = synthetic_sample();
     let reading = compensate(&mut cal, raw);
-    Line { status: "simulate", provenance: Some("SYNTHETIC"), error: None, reading: Some(reading) }
+    Line {
+        status: "simulate",
+        provenance: Some("SYNTHETIC"),
+        error: None,
+        reading: Some(reading),
+    }
 }
 
 fn measure(opts: &Opts) -> Line {
@@ -126,7 +146,12 @@ fn measure(opts: &Opts) -> Line {
         Ok(sample) => {
             let mut cal = sample.cal;
             let reading = compensate(&mut cal, sample.raw);
-            Line { status: "ok", provenance: Some("MEASURED"), error: None, reading: Some(reading) }
+            Line {
+                status: "ok",
+                provenance: Some("MEASURED"),
+                error: None,
+                reading: Some(reading),
+            }
         }
         Err(error) => Line {
             status: "no_source",
