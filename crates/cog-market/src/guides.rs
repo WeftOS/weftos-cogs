@@ -8,6 +8,7 @@
 
 /// `(cog id, bundle JSON)` for every bundled guide.
 pub const GUIDES: &[(&str, &str)] = &[
+    ("board-telemetry", include_str!("../catalog/guides/board-telemetry.json")),
     ("bridge", include_str!("../catalog/guides/bridge.json")),
     ("hlk-as201", include_str!("../catalog/guides/hlk-as201.json")),
     ("ld1040c-motion", include_str!("../catalog/guides/ld1040c-motion.json")),

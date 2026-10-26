@@ -239,6 +239,7 @@ mod tests {
                     category: "network".into(),
                     description: "links nodes".into(),
                     hardware_requirement: vec![],
+                    interfaces: vec![],
                     artifacts: BTreeMap::from([("arm".into(), art(420956)), ("arm64".into(), art(463560))]),
                 },
                 // same id as a Cognitum cog below -> ours must win
@@ -249,6 +250,7 @@ mod tests {
                     category: "health".into(),
                     description: "ours".into(),
                     hardware_requirement: vec![],
+                    interfaces: vec![],
                     artifacts: BTreeMap::from([("arm".into(), art(100000))]),
                 },
             ],

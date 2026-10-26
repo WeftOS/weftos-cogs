@@ -1,6 +1,7 @@
 // ADR-104 guide bundles. The canonical files live in cog-market. Each value is the JSON
 // a running cog serves at GET /guide.
 
+import boardTelemetry from "../../../crates/cog-market/catalog/guides/board-telemetry.json";
 import bridge from "../../../crates/cog-market/catalog/guides/bridge.json";
 import hlkAs201 from "../../../crates/cog-market/catalog/guides/hlk-as201.json";
 import ld1040c from "../../../crates/cog-market/catalog/guides/ld1040c-motion.json";
@@ -14,6 +15,7 @@ import soundDetect from "../../../crates/cog-market/catalog/guides/sound-detect.
 import spectrum from "../../../crates/cog-market/catalog/guides/spectrum.json";
 
 export const GUIDES: Record<string, unknown> = {
+  "board-telemetry": boardTelemetry as unknown,
   bridge: bridge as unknown,
   "hlk-as201": hlkAs201 as unknown,
   "ld1040c-motion": ld1040c as unknown,
