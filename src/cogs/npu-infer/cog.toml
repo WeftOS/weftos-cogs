@@ -1,0 +1,159 @@
+[cog]
+id = "npu-infer"
+name = "NPU Inference Service"
+version = "0.1.0"
+category = "industrial"
+description = "The node's NPU inference service. Owns GenieX on loopback (one server per resident model, restarted through its wrapper when a model fails to load) and answers service calls on the node's cogbus: a model id, a prompt, optionally one small inline image, and a priority. Calls queue by priority and run one at a time; models stay resident within a memory budget and the least recently used one is evicted to make room; the Stable Diffusion service on the same NPU is waited for. Queue depth, resident models and counters are published as a telemetry reading."
+binary = "cog-npu-infer-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/launcher.rs, src/geniex.rs: npu (starts GenieX, which opens /dev/fastrpc-cdsp; no other bus)
+interfaces = ["npu"]
+
+# GenieX is a Go program that reserves a large address space and maps model files and NPU
+# buffers; the host applies [resources].ram_mb as an address-space limit (RLIMIT_AS) on the cog and
+# on every child, and the planner also reserves it from the node's free memory. The default of
+# 256 MiB makes GenieX die at start ("failed to reserve page summary memory").
+# Smallest limit GenieX loaded and answered under (Ventuno Q, nctx 2048, 2026-10-26):
+#   gemma3-1b 4 GiB, qwen3.5-0.8b 4 GiB, gemma4-e2b 8 GiB, qwen3-4b (W4A16) 11 GiB (peak 10.7 GiB
+#   on a 1.2k-token prompt), qwen3-vl-4b at most 12 GiB (not narrowed).
+# 10240 covers the first three with 25% margin on the largest of them. A deployment that serves
+# qwen3-4b or the vision models needs 14336 or more, which the planner only accepts on a node with
+# that much free memory.
+[resources]
+ram_mb = 10240
+
+[config]
+
+[config.service]
+type = "string"
+label = "Service name"
+description = "Source id of the service topic svc.infer/<name> on this node"
+default = "venq-npu"
+cli_arg = "--service"
+
+[config.geniex_bin]
+type = "string"
+label = "GenieX wrapper"
+description = "Path of the GenieX wrapper script (the bare binary cannot find its libraries). Empty: $HOME/.local/bin/geniex"
+default = ""
+cli_arg = "--geniex-bin"
+
+[config.geniex_home]
+type = "string"
+label = "GenieX home"
+description = "$HOME for GenieX, which finds its model cache through it. Empty: derived from the wrapper path (<home>/.local/bin/geniex)"
+default = ""
+cli_arg = "--geniex-home"
+advanced = true
+
+[config.state_dir]
+type = "string"
+label = "State directory"
+description = "Where measured model costs and the GenieX logs are kept. Empty: neither is kept"
+default = ""
+cli_arg = "--state-dir"
+
+[config.budget_mib]
+type = "integer"
+label = "Model memory budget"
+description = "Memory the resident models may use together. A model is loaded only if it fits; the least recently used ones are evicted to make room."
+default = 8000
+min = 256
+max = 1000000
+unit = "MiB"
+cli_arg = "--budget-mib"
+
+[config.reserve_mib]
+type = "integer"
+label = "Free memory to keep"
+description = "System MemAvailable that must remain after a model loads (the image service, the daemon and builds need it)"
+default = 2048
+min = 0
+max = 1000000
+unit = "MiB"
+cli_arg = "--reserve-mib"
+advanced = true
+
+[config.slots]
+type = "integer"
+label = "Resident models"
+description = "Most models loaded at once; also the number of loopback ports used from the base port"
+default = 3
+min = 1
+max = 8
+cli_arg = "--slots"
+advanced = true
+
+[config.queue]
+type = "integer"
+label = "Queue length"
+description = "Calls that may wait; more are refused as busy"
+default = 64
+min = 1
+max = 1024
+cli_arg = "--queue"
+advanced = true
+
+[config.publish_secs]
+type = "integer"
+label = "Telemetry period"
+description = "Seconds between telemetry readings"
+default = 5
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--publish-secs"
+advanced = true
+
+[config.base_port]
+type = "integer"
+label = "First GenieX port"
+description = "Loopback port of the first GenieX server; one more port per resident model"
+default = 18181
+min = 1024
+max = 65000
+cli_arg = "--base-port"
+advanced = true
+
+[config.sd_url]
+type = "string"
+label = "Image service"
+description = "host:port of the Stable Diffusion service to wait for before using the NPU; none to skip"
+default = "127.0.0.1:18700"
+cli_arg = "--sd-url"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "With --once: run one synthetic call through the scheduler, no GenieX"
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# Providing the service: svc.infer/<service> (a service topic; WeftOS ADR-122 section 12) and the
+# telemetry reading the node turns into accel.npu facts. A cog that calls this service lists, in
+# its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "svc.infer"
+#   schema = "infer.v1"
+#
+# and calls svc.infer/venq-npu with an infer.v1 body (model, text, priority, ...).
+
+[[outputs]]
+topic = "svc.infer"
+schema = "infer.v1"
+class = "reading"
+rate = "on demand; one reply per call"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every 5 s"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

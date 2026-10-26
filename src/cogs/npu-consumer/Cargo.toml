@@ -1,0 +1,22 @@
+[workspace]
+
+[package]
+name = "cog-npu-consumer"
+version = "0.1.0"
+edition = "2021"
+description = "Test consumer for the NPU inference service: calls svc.infer with a cycle of models, logs every call and the service telemetry, for acceptance runs and soaks"
+publish = false
+
+[[bin]]
+name = "cog-npu-consumer"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1.0"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
