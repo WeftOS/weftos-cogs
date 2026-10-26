@@ -249,7 +249,7 @@ mod tests {
         assert_eq!(classify("http://127.0.0.1:9480"), Reach::ThisMachine);
         assert_eq!(classify("http://100.64.0.22:9480"), Reach::Tailnet);
         assert_eq!(classify("http://[fd7a:115c:a1e0::1]:9480"), Reach::Tailnet);
-        assert_eq!(classify("http://192.168.1.235:9480"), Reach::Lan);
+        assert_eq!(classify("http://192.168.1.42:9480"), Reach::Lan);
         assert_eq!(classify("http://10.1.2.3:9480"), Reach::Lan);
         assert_eq!(classify("http://cog0.local:9480"), Reach::Other);
     }

@@ -302,7 +302,7 @@ mod tests {
         assert!(may_enroll(Some("127.0.0.1")));
         assert!(may_enroll(Some("::1")));
         assert!(may_enroll(Some("100.64.0.22")));
-        assert!(!may_enroll(Some("192.168.1.235")));
+        assert!(!may_enroll(Some("192.168.1.42")));
         assert!(!may_enroll(Some("10.1.2.3")));
         assert!(!may_enroll(None));
         assert!(keys.issue(Some("192.168.1.20")).is_err());
