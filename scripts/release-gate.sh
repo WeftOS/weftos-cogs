@@ -69,9 +69,8 @@ esac
 
 export CARGO_TARGET_DIR="$ROOT/.cargo-target/host"
 bin="$CARGO_TARGET_DIR/debug/weft-cog-repo"
-if [ ! -x "$bin" ]; then
-  cargo build --locked -p cog-repo --bin weft-cog-repo
-fi
+# Always rebuild: a stale binary from an earlier checkout would sign with old commands.
+cargo build --locked -p cog-repo --bin weft-cog-repo
 
 build_started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 scripts/cross-build.sh
