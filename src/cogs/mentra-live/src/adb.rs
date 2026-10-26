@@ -90,18 +90,20 @@ pub trait TeleSource {
     fn describe(&self) -> String;
 }
 
-/// Resolve the `adb` binary: explicit `--adb`, then `$ADB`, then any known absolute install, then
-/// bare `adb` on `$PATH`.
+/// Resolve the `adb` binary: explicit `--adb`, then `$ADB` (either is used as given), then any known
+/// absolute install, then bare `adb` on `$PATH`.
 pub fn resolve_adb(explicit: &Option<String>) -> Result<PathBuf, String> {
-    let mut candidates: Vec<String> = Vec::new();
+    // An explicit choice is final, even when the file is missing: the spawn then fails
+    // honestly (no_source) instead of quietly using some other adb on the machine.
     if let Some(p) = explicit.as_ref().filter(|s| !s.is_empty()) {
-        candidates.push(p.clone());
+        return Ok(PathBuf::from(p));
     }
     if let Ok(p) = std::env::var("ADB") {
         if !p.is_empty() {
-            candidates.push(p);
+            return Ok(PathBuf::from(p));
         }
     }
+    let mut candidates: Vec<String> = Vec::new();
     if let Ok(home) = std::env::var("HOME") {
         candidates.push(format!("{home}/Library/Android/sdk/platform-tools/adb"));
         candidates.push(format!("{home}/Android/Sdk/platform-tools/adb"));
@@ -381,6 +383,12 @@ impl TeleSource for Sim {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_explicit_adb_path_is_used_even_when_missing() {
+        let p = resolve_adb(&Some("/nonexistent/adb".into())).unwrap();
+        assert_eq!(p, PathBuf::from("/nonexistent/adb"));
+    }
 
     #[test]
     fn parses_dumpsys_battery() {

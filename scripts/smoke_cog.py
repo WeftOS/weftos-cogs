@@ -13,6 +13,7 @@ Every cog must run at least one of these commands.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import tomllib
@@ -31,6 +32,11 @@ def main() -> int:
     console = cfg.get("console", {})
     timeout = int(console.get("max_runtime_secs", 15))
     ran = 0
+    # The smoke test needs no hardware: point adb at nothing, so a device attached to the
+    # machine running the gate cannot change a cog's answer. COG_SMOKE_REAL_ADB=1 opts out.
+    env = dict(os.environ)
+    if os.environ.get("COG_SMOKE_REAL_ADB") != "1":
+        env["ADB"] = "/nonexistent/adb"
     for cmd in console.get("allowed_commands", []):
         parts = cmd.split()
         if not parts or not set(parts) <= SAFE:
@@ -42,6 +48,7 @@ def main() -> int:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                env=env,
             )
         except subprocess.TimeoutExpired:
             print(f"smoke {args.cog}: FAIL {cmd!r} exceeded {timeout}s")
