@@ -1,0 +1,34 @@
+# Sensor guide for vision-detect (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are Markdown files next to this one (guide/<page>.md).
+
+schema = 1
+title = "Finding objects in camera frames"
+sensor = "Frames from the camera cog, a vision model on the node"
+cog = "vision-detect"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "model", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+cog_installed = "setup"
+cog_running = "setup"
+model = "model"
+no_source = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "video.frame-ref/cam0"
+detail = "hash, size, blob handle"
+
+[[flow]]
+name = "vision-detect cog"
+detail = "newest frame, rate limit"
+
+[[flow]]
+name = "svc.infer"
+detail = "vision model, handle in the call"
+
+[[flow]]
+name = "detections/vis0"
+detail = "labels and boxes"

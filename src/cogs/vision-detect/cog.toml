@@ -1,0 +1,161 @@
+[cog]
+id = "vision-detect"
+name = "Vision Detect"
+version = "0.1.0"
+category = "ai"
+description = "Finds what is in camera frames. Reads the video.frame-ref.v1 readings of the camera cog; a reading that carries the frame's blob.v1 handle is passed, as the handle and not as pixels, in a call to the node's vision model (svc.infer/<service>, infer.v1 with image_blob, the npu-infer cog), and the model's list of objects becomes a detections.v1 reading on detections/<name>. One frame is in flight at a time, newer frames replace older waiting ones, and calls are at least min-interval apart, so the camera's rate never sets the NPU's load. A label the model gives without a usable box becomes a whole-frame box. It opens no device and runs no model itself."
+binary = "cog-vision-detect-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/main.rs: none (calls a bus service; opens no device)
+interfaces = ["none"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Watch window (--once)"
+description = "Seconds a single --once run watches for"
+default = 10
+min = 1
+max = 120
+unit = "seconds"
+cli_arg = "--window"
+
+[config.model]
+type = "string"
+label = "Model"
+description = "A vision model of the npu-infer catalog, by alias"
+default = "qwen3-vl-4b"
+cli_arg = "--model"
+
+[config.service]
+type = "string"
+label = "Inference service"
+description = "Source id of the svc.infer service to call: svc.infer/<service>"
+default = "venq-npu"
+cli_arg = "--service"
+
+[config.source]
+type = "string"
+label = "Camera source"
+description = "Source id of the frames to look at: video.frame-ref/<source>"
+default = "cam0"
+cli_arg = "--source"
+
+[config.name]
+type = "string"
+label = "Name"
+description = "Source id of the detections this cog publishes: detections/<name>"
+default = "vis0"
+cli_arg = "--name"
+advanced = true
+
+[config.min_interval_ms]
+type = "integer"
+label = "Shortest time between calls"
+description = "Frames that arrive sooner than this after the last call are skipped. A vision model takes seconds per frame; this keeps the NPU free for other work."
+default = 3000
+min = 0
+max = 600000
+unit = "ms"
+cli_arg = "--min-interval-ms"
+
+[config.priority]
+type = "integer"
+label = "Queue priority"
+description = "Priority of the call in the inference queue, 0 (background) to 9 (interactive). Below the voice assistant's 7, so a spoken question is not made to wait for a frame."
+default = 3
+min = 0
+max = 9
+cli_arg = "--priority"
+advanced = true
+
+[config.max_tokens]
+type = "integer"
+label = "Answer length"
+description = "Most tokens the model may generate for the list"
+default = 256
+min = 16
+max = 1024
+cli_arg = "--max-tokens"
+advanced = true
+
+[config.timeout_s]
+type = "integer"
+label = "Call timeout"
+description = "Seconds to wait for the service, queueing and a model load included"
+default = 120
+min = 5
+max = 600
+unit = "seconds"
+cli_arg = "--timeout-s"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8071"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Look at frame-ref bodies from a file of JSON lines through the real service instead of the bus. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Look at one canned frame with a canned answer, no service, marked SYNTHETIC. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# Reads frame handles, calls the vision model, publishes detections. A cog that acts on detections
+# lists, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "detections"
+#   schema = "detections.v1"
+#
+# and reads detections/<name>.
+
+[[inputs]]
+topic = "video.frame-ref"
+schema = "video.frame-ref.v1"
+policy = "sample"
+
+[[inputs]]
+topic = "svc.infer"
+schema = "infer.v1"
+
+[[outputs]]
+topic = "detections"
+schema = "detections.v1"
+class = "reading"
+rate = "one per frame looked at"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

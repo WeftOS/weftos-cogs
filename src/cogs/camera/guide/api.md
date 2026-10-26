@@ -4,7 +4,7 @@
 
 ## Reading `video.frame-ref/<source>`
 
-`video.frame-ref.v1`, class `reading`: `source_id`, `node_id`, `t_ns`, `seq`, `hash` (BLAKE3 of the JPEG, 64 lower-case hex), `width`, `height`, `pixel_format` (`mjpeg`), `ttl_ms`. The bytes are in the cog's data directory as `frames/<hash>.jpg` for `ttl_ms`.
+`video.frame-ref.v1`, class `reading`: `source_id`, `node_id`, `t_ns`, `seq`, `hash` (BLAKE3 of the JPEG, 64 lower-case hex), `width`, `height`, `pixel_format` (`mjpeg`), `ttl_ms`, and `blob` (a `blob.v1` handle to the JPEG in the node's blob store, when it was put there; its `hash` equals `hash`). The bytes are also in the cog's data directory as `frames/<hash>.jpg` for `ttl_ms`.
 
 ## Reading `telemetry/<source>`
 
@@ -21,6 +21,7 @@
 | `width`, `height` | number/null | size of the last frame |
 | `mean_frame_kb` | number | mean JPEG size |
 | `frame_refs_published` | number | readings sent to the broker |
+| `blobs_put` | number | frames put in the blob store |
 | `capture_errors` | number | unreadable frames |
 | `last_hash` | string/null | hash of the newest frame |
 | `bus` | object | `connected`, `seq`, `error` |
@@ -47,4 +48,4 @@ Eight floats; a source that is absent is **-1**.
 
 ## Settings
 
-`--interval`, `--fps`, `--width`, `--height`, `--ttl-ms`, `--source`, `--camera-name`, `--device`, `--frames-dir`, `--api-bind`, `--replay`, `--simulate`.
+`--interval`, `--fps`, `--width`, `--height`, `--ttl-ms`, `--no-blob`, `--source`, `--camera-name`, `--device`, `--frames-dir`, `--api-bind`, `--replay`, `--simulate`.

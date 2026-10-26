@@ -41,6 +41,7 @@ struct Opts {
     width: u32,
     height: u32,
     ttl_ms: u64,
+    no_blob: bool,
     source: String,
     device: Option<String>,
     camera_name: Option<String>,
@@ -106,6 +107,7 @@ fn parse_opts(a: &[String]) -> Opts {
             .map(String::from)
             .or_else(|| std::env::var("WEFTOS_COGBUS").ok()),
         api_bind: arg(a, "--api-bind").unwrap_or("127.0.0.1:8065").to_string(),
+        no_blob: a.iter().any(|x| x == "--no-blob"),
         simulate: a.iter().any(|x| x == "--simulate"),
         replay: arg(a, "--replay").map(String::from),
     }
@@ -137,6 +139,7 @@ struct Window {
     frames: u64,
     bytes: u64,
     refs: u64,
+    blobs: u64,
     errors: u64,
     width: u32,
     height: u32,
@@ -200,6 +203,7 @@ fn build_report(win: &Window, c: &Context) -> (Value, [f64; 8]) {
         "height": if win.frames > 0 { json!(win.height) } else { Value::Null },
         "mean_frame_kb": round(mean_kb, 1),
         "frame_refs_published": win.refs,
+        "blobs_put": win.blobs,
         "capture_errors": win.errors,
         "last_hash": win.last_hash,
         "devices": c.devices,
@@ -242,15 +246,23 @@ struct Stored<'a> {
     width: u32,
     height: u32,
     ttl_ms: u64,
+    /// The frame's `blob.v1` handle, when it was put in the node's blob store.
+    blob: Option<Value>,
 }
 
 /// The `video.frame-ref.v1` body for a stored frame.
 fn frame_ref(source: &str, node_id: &str, t_ns: u64, seq: u64, f: &Stored) -> Value {
-    json!({
+    let mut v = json!({
         "source_id": source, "node_id": node_id, "t_ns": t_ns, "seq": seq,
         "hash": f.hash, "width": f.width, "height": f.height, "pixel_format": "mjpeg",
         "ttl_ms": f.ttl_ms.min(3_600_000),
-    })
+    });
+    // Carried in the reading, the handle gives its readers access to the bytes; they can pass
+    // it on in a service call.
+    if let Some(b) = &f.blob {
+        v["blob"] = b.clone();
+    }
+    v
 }
 
 /// The broker side: connects when it can and publishes the readings.
@@ -318,6 +330,24 @@ impl Link {
         b.publish(KIND, source, SCHEMA, t, body)
             .map(|_| true)
             .inspect_err(|e| self.state.error = Some(e.clone()))
+    }
+
+    /// Put a frame in the blob store; `None` when there is no broker or it refused (the
+    /// reason is kept in the bus state, and the reading goes out without a handle).
+    fn put_blob(&mut self, bytes: &[u8], ttl_ms: u64) -> Option<Value> {
+        self.connect();
+        let b = self.bus.as_ref().filter(|b| !b.is_closed())?;
+        match b.put_blob(
+            "image/jpeg",
+            bytes,
+            Duration::from_millis(ttl_ms.clamp(1000, 3_600_000)),
+        ) {
+            Ok(h) => Some(h),
+            Err(e) => {
+                self.state.error = Some(format!("blob: {e}"));
+                None
+            }
+        }
     }
 
     fn telemetry(&mut self, source: &str, win: &Window, secs: f64) {
@@ -397,6 +427,12 @@ fn take_frame(
             win.frames += 1;
             win.bytes += bytes.len() as u64;
             (win.width, win.height) = (w, h);
+            let blob = if o.no_blob {
+                None
+            } else {
+                link.put_blob(&bytes, o.ttl_ms)
+            };
+            win.blobs += blob.is_some() as u64;
             match link.announce(
                 &o.source,
                 &Stored {
@@ -404,6 +440,7 @@ fn take_frame(
                     width: w,
                     height: h,
                     ttl_ms: o.ttl_ms,
+                    blob,
                 },
             ) {
                 Ok(true) => win.refs += 1,
@@ -670,8 +707,24 @@ mod tests {
             width: 1280,
             height: 720,
             ttl_ms: 10_000,
+            blob: None,
         };
         let v = frame_ref("cam0", &"a".repeat(32), 5, 1, &f);
+        assert!(
+            v.get("blob").is_none(),
+            "no handle unless the frame was put in the store"
+        );
+        let handle = json!({"hash": h, "size": 51200, "media_type": "image/jpeg", "expires_ms": 9});
+        let with = Stored {
+            blob: Some(handle.clone()),
+            ..f
+        };
+        assert_eq!(
+            frame_ref("cam0", &"a".repeat(32), 5, 1, &with)["blob"],
+            handle,
+            "the handle rides in the reading"
+        );
+        let f = with;
         assert_eq!(v["hash"].as_str().unwrap().len(), 64);
         assert_eq!(
             (
@@ -712,6 +765,7 @@ mod tests {
             frames: 10,
             bytes: 10 * 51_200,
             refs: 10,
+            blobs: 10,
             errors: 1,
             width: 1280,
             height: 720,

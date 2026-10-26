@@ -112,6 +112,14 @@ default = ""
 cli_arg = "--replay"
 advanced = true
 
+[config.no_blob]
+type = "boolean"
+label = "No blob store"
+description = "Do not put frames in the node's blob store; announce them with a hash only. Readers then cannot hand a frame to a service."
+default = false
+cli_arg = "--no-blob"
+advanced = true
+
 [config.simulate]
 type = "boolean"
 label = "Simulate"
@@ -126,14 +134,21 @@ advanced = true
 #   topic = "video.frame-ref"
 #   schema = "video.frame-ref.v1"
 #
-# and reads video.frame-ref/<source>. The reading holds a hash, not pixels; the bytes are
-# fetched from the owner by hash (blob handles are WeftOS ADR-122 B5; until then, on loopback).
+# and reads video.frame-ref/<source>. The reading holds a hash and, when the frame was put in the node's blob store
+# (WeftOS ADR-122 B5), its blob.v1 handle in `blob`: a reader that gets the reading may fetch the bytes or pass
+# the handle in a service call.
 
 [[outputs]]
 topic = "video.frame-ref"
 schema = "video.frame-ref.v1"
 class = "reading"
 rate = "one per captured frame"
+
+[[outputs]]
+topic = "video.frame"
+schema = "blob.v1"
+class = "blob"
+rate = "one JPEG per captured frame, kept for the frame lifetime"
 
 [[outputs]]
 topic = "telemetry"

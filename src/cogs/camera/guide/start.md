@@ -21,7 +21,7 @@ flow
 
 ## Honest limits
 
-- The pixels do not go on the bus. The reading is a handle; until the node's blob store exists (WeftOS ADR-122 B5) the bytes are reachable only on this node's loopback, by hash from the data directory or at `/frame.jpg` (the latest one).
+- The pixels do not go in the reading. Each frame is also put in the node's blob store (WeftOS ADR-122 B5), and the reading carries its `blob.v1` handle in `blob`: a reader that receives the reading may fetch the JPEG or hand the handle to a service (a vision model) in a call. Without a broker, or with **No blob store** set, the reading has only the hash; the bytes are then reachable on this node's loopback, from the data directory or at `/frame.jpg` (the latest one).
 - Frames are MJPEG as the camera makes them. Nothing is decoded here. H.264 on request is not implemented.
 - A frame's bytes are deleted after `--ttl-ms` (10 s by default); a reading older than that points at nothing.
 - On a node where every cog runs under one user id, the node refuses a second claim on the camera but cannot stop a cog from opening `/dev/video0` behind its back. The listing says `device_isolation: advisory`.
