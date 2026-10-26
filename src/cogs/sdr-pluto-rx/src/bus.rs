@@ -120,7 +120,7 @@ pub struct Reply {
 type Pending = Mutex<HashMap<u64, Sender<Reply>>>;
 
 pub struct Bus {
-    w: Mutex<UnixStream>,
+    w: Arc<Mutex<UnixStream>>,
     next: AtomicU64,
     pending: Arc<Pending>,
     closed: Arc<AtomicBool>,
@@ -138,8 +138,11 @@ impl Bus {
             s: s.try_clone().map_err(|e| e.to_string())?,
             fds: VecDeque::new(),
         };
-        let mut w = s;
-        write_frame(&mut w, &json!({"op": "hello", "id": 1, "token": token}))?;
+        let w = Arc::new(Mutex::new(s));
+        write_frame(
+            &mut *w.lock().unwrap_or_else(|p| p.into_inner()),
+            &json!({"op": "hello", "id": 1, "token": token}),
+        )?;
         let first = read_frame(&mut rd)?.ok_or("the broker closed the connection")?;
         if first["type"] != "ok" {
             return Err(format!(
@@ -154,13 +157,13 @@ impl Bus {
         let pending: Arc<Pending> = Arc::default();
         let closed = Arc::new(AtomicBool::new(false));
         let (ctx, crx) = channel();
-        let (p2, c2) = (pending.clone(), closed.clone());
+        let (p2, c2, wp) = (pending.clone(), closed.clone(), w.clone());
         std::thread::Builder::new()
             .name("bus-read".into())
             .spawn(move || {
                 loop {
                     match read_frame(&mut rd) {
-                        Ok(Some(f)) => dispatch(&p2, &ctx, &mut rd, f),
+                        Ok(Some(f)) => dispatch(&p2, &ctx, &wp, &mut rd, f),
                         Ok(None) => break,
                         Err(e) => {
                             eprintln!("[cog-sdr-pluto-rx] bus read: {e}");
@@ -173,7 +176,7 @@ impl Bus {
             })
             .map_err(|e| e.to_string())?;
         let bus = Bus {
-            w: Mutex::new(w),
+            w,
             next: AtomicU64::new(2),
             pending,
             closed,
@@ -291,7 +294,19 @@ impl Bus {
     }
 }
 
-fn dispatch(pending: &Pending, calls: &Sender<Value>, rd: &mut FdRead, f: Value) {
+fn dispatch(
+    pending: &Pending,
+    calls: &Sender<Value>,
+    w: &Mutex<UnixStream>,
+    rd: &mut FdRead,
+    f: Value,
+) {
+    // The broker pings a silent connection and closes it if no frame answers (cogbus gap 4).
+    if f["type"] == "ping" {
+        let mut g = w.lock().unwrap_or_else(|p| p.into_inner());
+        let _ = write_frame(&mut *g, &json!({"op": "pong", "id": 0}));
+        return;
+    }
     match f["type"].as_str() {
         Some("ok") | Some("error") => {
             let n = f["result"]["fds"].as_u64().unwrap_or(0) as usize;
@@ -480,5 +495,18 @@ mod tests {
             std::ptr::write_unaligned(libc::CMSG_DATA(c).cast::<RawFd>(), fd);
             assert!(libc::sendmsg(s.as_raw_fd(), &msg, 0) >= 0);
         }
+    }
+
+    #[test]
+    fn a_ping_from_the_broker_is_answered_with_a_pong() {
+        let (path, l) = sock("ping");
+        let h = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            hello(&mut s);
+            write_frame(&mut s, &json!({"type": "ping"})).unwrap();
+            read_frame(&mut s).unwrap().unwrap()
+        });
+        let (_bus, _rx) = Bus::connect(path.to_str().unwrap(), "tok").unwrap();
+        assert_eq!(h.join().unwrap(), json!({"op": "pong", "id": 0}));
     }
 }

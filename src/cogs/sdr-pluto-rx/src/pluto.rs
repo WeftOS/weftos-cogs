@@ -33,6 +33,13 @@ pub struct Pluto {
     safe: SafeState,
 }
 
+/// A temperature the sensors can really report. The AD9361's sensor read -80 and -75 degrees C
+/// after the Pluto came back from a reset on the overnight soak; such a value is dropped, not
+/// published.
+fn plausible_temp(t: f64) -> Option<f64> {
+    (-40.0..=125.0).contains(&t).then_some(t)
+}
+
 fn num(s: &str) -> Option<f64> {
     s.split_whitespace().next()?.parse().ok()
 }
@@ -291,7 +298,7 @@ impl Radio for Pluto {
                 .and_then(num)
                 .unwrap_or(0.0);
             let scale = c.attr("scale").ok().as_deref().and_then(num).unwrap_or(1.0);
-            Some((raw + off) * scale / 1000.0)
+            plausible_temp((raw + off) * scale / 1000.0)
         });
         HwStatus {
             lo_hz: rd(&self.rx_lo, "frequency").and_then(|s| s.parse().ok()),
@@ -303,7 +310,7 @@ impl Radio for Pluto {
             temp_phy_c: self
                 .temp
                 .and_then(|c| c.attr("input").ok()?.parse::<f64>().ok())
-                .map(|m| m / 1000.0),
+                .and_then(|m| plausible_temp(m / 1000.0)),
             temp_zynq_c: zynq,
         }
     }
@@ -371,6 +378,14 @@ mod tests {
             let sum: i32 = taps.iter().map(|t| t.0).sum();
             assert!((29_000..=30_000).contains(&sum), "dc gain {sum}");
         }
+    }
+
+    #[test]
+    fn implausible_temperatures_are_dropped() {
+        assert_eq!(plausible_temp(41.2), Some(41.2));
+        assert_eq!(plausible_temp(-80.702), None);
+        assert_eq!(plausible_temp(-75.439), None);
+        assert_eq!(plausible_temp(300.0), None);
     }
 
     #[test]

@@ -9,6 +9,7 @@
 | `dead_receive_path` | Every sample is zero. Digital loopback was left on, or the front end is not running. The cog switches loopback off when it takes the radio; if it persists, replug the radio. |
 | `samples.lost` rising | The link cannot keep up. Lower the rate (5 MS/s is safe over USB 2.0), use `ip:` on Linux, or close other users of the USB bus. |
 | `pending_unconfirmed` large, `lost` small | A loss is in progress and not yet confirmed (about 0.25 s). |
+| `usb_hub.isochronous_active`, `rate_over_advice` | A camera or microphone streams on the same USB root hub and takes bandwidth from the radio; stay at `advised_max_rate_sps` (4 MS/s) or move one of them to another hub. |
 | `disconnects` rising | The radio dropped off the bus: power or cable. The cog logs it and reopens; it never power-cycles anything. |
 | `apply_errors` | A band outside the tuning range or a rate the chip refused; `error` says which. |
 
