@@ -1,0 +1,162 @@
+[cog]
+id = "camera"
+name = "Camera"
+version = "0.1.0"
+category = "signal"
+description = "Owns a V4L2 camera (the owner's USB camera first) and announces its frames on the node's cogbus as video.frame-ref.v1 readings: a BLAKE3 hash, the size, mjpeg and how long the bytes are kept. The JPEG stays in the cog's data directory and on a loopback-only /frame.jpg; raw frames do not cross the bus. The device is the one the host hands the owner (WEFTOS_DEVICES); a UVC camera's metadata node is skipped. Fails honestly with no_source when no capture node is handed or present. H.264 on request is not implemented."
+binary = "cog-camera-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/camera.rs: camera (runs gst-launch-1.0 v4l2src on the handed /dev/video* node)
+interfaces = ["camera"]
+
+# The devices this cog owns. The node refuses a second cog that claims a video node or names
+# one in its arguments (WeftOS ADR-122 section 4b).
+[[devices]]
+path = "/dev/video*"
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.fps]
+type = "integer"
+label = "Frame rate"
+description = "Frames per second requested from the camera, and announced"
+default = 2
+min = 1
+max = 30
+unit = "fps"
+cli_arg = "--fps"
+
+[config.width]
+type = "integer"
+label = "Frame width"
+description = "Width in pixels requested as MJPEG"
+default = 1280
+min = 64
+max = 7680
+unit = "px"
+cli_arg = "--width"
+
+[config.height]
+type = "integer"
+label = "Frame height"
+description = "Height in pixels requested as MJPEG"
+default = 720
+min = 64
+max = 4320
+unit = "px"
+cli_arg = "--height"
+
+[config.ttl_ms]
+type = "integer"
+label = "Frame lifetime"
+description = "How long a frame's bytes are kept in the data directory after they are announced"
+default = 10000
+min = 1000
+max = 3600000
+unit = "ms"
+cli_arg = "--ttl-ms"
+
+[config.source]
+type = "string"
+label = "Source id"
+description = "Source id of the readings: video.frame-ref/<source>. Lowercase letters, digits, dot, dash, underscore."
+default = "cam0"
+cli_arg = "--source"
+
+[config.camera_name]
+type = "string"
+label = "Camera name"
+description = "Substring of the node's name in /sys/class/video4linux/<node>/name. Picks one camera when the host handed several. Empty: the lowest capture node."
+default = ""
+cli_arg = "--camera-name"
+
+[config.device]
+type = "string"
+label = "Video node"
+description = "Video node by hand, for example /dev/video0. Overrides the handed devices; use it for a bench run only."
+default = ""
+cli_arg = "--device"
+advanced = true
+
+[config.frames_dir]
+type = "string"
+label = "Frame directory"
+description = "Where announced frames are kept. Default: frames/ in the cog's data directory."
+default = ""
+cli_arg = "--frames-dir"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export and /frame.jpg"
+default = "127.0.0.1:8065"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Announce a JPEG file as if the camera had sent it, instead of capturing. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.no_blob]
+type = "boolean"
+label = "No blob store"
+description = "Do not put frames in the node's blob store; announce them with a hash only. Readers then cannot hand a frame to a service."
+default = false
+cli_arg = "--no-blob"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Announce synthetic frames (valid structure, no image data) marked SYNTHETIC instead of capturing. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# What this cog publishes. A cog that wants frames lists, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "video.frame-ref"
+#   schema = "video.frame-ref.v1"
+#
+# and reads video.frame-ref/<source>. The reading holds a hash and, when the frame was put in the node's blob store
+# (WeftOS ADR-122 B5), its blob.v1 handle in `blob`: a reader that gets the reading may fetch the bytes or pass
+# the handle in a service call.
+
+[[outputs]]
+topic = "video.frame-ref"
+schema = "video.frame-ref.v1"
+class = "reading"
+rate = "one per captured frame"
+
+[[outputs]]
+topic = "video.frame"
+schema = "blob.v1"
+class = "blob"
+rate = "one JPEG per captured frame, kept for the frame lifetime"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

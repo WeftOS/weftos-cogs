@@ -1,0 +1,35 @@
+# Sensor guide for can-fd (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are Markdown files next to this one (guide/<page>.md).
+
+schema = 1
+title = "A CAN bus on a Linux board"
+sensor = "CAN / CAN FD controller exposed as a SocketCAN interface"
+cog = "can-fd"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "bus", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+cog_installed = "setup"
+cog_running = "setup"
+bus = "bus"
+interface_up = "setup"
+no_source = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "CAN bus"
+detail = "transceiver, wiring, termination"
+
+[[flow]]
+name = "SocketCAN"
+detail = "canX, bit rate set by the operator"
+
+[[flow]]
+name = "can-fd cog"
+detail = "receive only, error classes, load"
+
+[[flow]]
+name = "Outputs"
+detail = "can.frame stream, telemetry, :8072"

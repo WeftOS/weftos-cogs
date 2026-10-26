@@ -1,0 +1,155 @@
+[cog]
+id = "assistant"
+name = "Assistant"
+version = "0.1.0"
+category = "ai"
+description = "Answers spoken commands. Reads the commands wake-word publishes (transcript/<source>, default wake0), asks the node's language model through the service svc.infer/<service> (infer.v1, the npu-infer cog) with a short system prompt and the last few turns, and publishes the answer, cleaned for speech, as a transcript.v1 reading on transcript/<name> (default reply0) for the tts cog. A model that cannot be reached is answered with a short apology so the loop never goes silent, and counted. It opens no device and runs no model itself."
+binary = "cog-assistant-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/main.rs: none (calls a bus service; opens no device)
+interfaces = ["none"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Listen window (--once)"
+description = "Seconds a single --once run listens for"
+default = 10
+min = 1
+max = 120
+unit = "seconds"
+cli_arg = "--window"
+
+[config.model]
+type = "string"
+label = "Model"
+description = "A model of the npu-infer catalog, by alias. Small models answer faster; the voice loop wants an answer in seconds."
+default = "qwen3.5-0.8b"
+cli_arg = "--model"
+
+[config.service]
+type = "string"
+label = "Inference service"
+description = "Source id of the svc.infer service to call: svc.infer/<service>"
+default = "venq-npu"
+cli_arg = "--service"
+
+[config.source]
+type = "string"
+label = "Command source"
+description = "Source id of the commands to answer: transcript/<source>"
+default = "wake0"
+cli_arg = "--source"
+
+[config.name]
+type = "string"
+label = "Name"
+description = "Source id of the answers this cog publishes: transcript/<name>"
+default = "reply0"
+cli_arg = "--name"
+advanced = true
+
+[config.max_tokens]
+type = "integer"
+label = "Answer length"
+description = "Most tokens the model may generate. A spoken answer is short."
+default = 96
+min = 8
+max = 1024
+cli_arg = "--max-tokens"
+advanced = true
+
+[config.priority]
+type = "integer"
+label = "Queue priority"
+description = "Priority of the call in the inference queue, 0 (background) to 9 (interactive)"
+default = 7
+min = 0
+max = 9
+cli_arg = "--priority"
+advanced = true
+
+[config.history]
+type = "integer"
+label = "Remembered turns"
+description = "How many past exchanges go into each prompt. 0 answers every command on its own."
+default = 2
+min = 0
+max = 8
+cli_arg = "--history"
+advanced = true
+
+[config.timeout_s]
+type = "integer"
+label = "Call timeout"
+description = "Seconds to wait for the service, queueing and a model load included"
+default = 90
+min = 5
+max = 600
+unit = "seconds"
+cli_arg = "--timeout-s"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8069"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Answer commands from a file of JSON lines {\"text\": ...} through the real service instead of the bus. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Answer two canned commands with canned replies, no service, marked SYNTHETIC. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# Reads commands, calls the inference service, publishes answers. The service is declared as an
+# input of the svc.infer kind with the infer.v1 schema (WeftOS ADR-122 section 12).
+
+[[inputs]]
+topic = "transcript"
+schema = "transcript.v1"
+policy = "drop-oldest"
+
+[[inputs]]
+topic = "svc.infer"
+schema = "infer.v1"
+
+[[outputs]]
+topic = "transcript"
+schema = "transcript.v1"
+class = "reading"
+rate = "one per command"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

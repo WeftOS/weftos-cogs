@@ -1,0 +1,113 @@
+[cog]
+id = "can-fd"
+name = "CAN / CAN FD"
+version = "0.1.0"
+category = "industrial"
+description = "Owns the node's SocketCAN interface and publishes what is on the bus: every data frame, classic or CAN FD, as a can.frame.v1 record in the cogbus stream can.frame/<source> (the interface name by default), with counters for error frames by class, bus-off, the controller's error counters and the bus load, and a check that the interface's bit rate is the one configured. Receive only: it never writes to the bus and never configures the interface (bringing it up and its bit rate are the operator's); transmitting is WeftOS ADR-123, which is not accepted. Fails honestly with no_source when the interface is missing or down."
+binary = "cog-can-fd-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/socket.rs: can (a receive-only raw SocketCAN socket on the handed interface)
+interfaces = ["can"]
+
+# The interface this cog owns. The host hands the owner the interface names in WEFTOS_DEVICES (no
+# leading slash); the node refuses a second cog that claims a CAN interface (WeftOS ADR-122
+# section 4b). One instance listens to one interface, the first handed or --iface.
+[[devices]]
+netdev = "can*"
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Listen window (--once)"
+description = "Seconds a single --once run listens for"
+default = 10
+min = 1
+max = 600
+unit = "seconds"
+cli_arg = "--window"
+
+[config.iface]
+type = "string"
+label = "Interface"
+description = "The SocketCAN interface to listen on, for example can0 or vcan0. Empty: the first interface the host handed the owner."
+default = ""
+cli_arg = "--iface"
+
+[config.bitrate]
+type = "integer"
+label = "Configured bit rate"
+description = "The nominal bit rate the bus is meant to run at. The cog does not set it; it compares it with what the kernel reports and uses it for the bus load."
+default = 500000
+min = 10000
+max = 1000000
+unit = "bit/s"
+cli_arg = "--bitrate"
+
+[config.source]
+type = "string"
+label = "Source id"
+description = "Source id of the stream: can.frame/<source>. Empty: the interface name."
+default = ""
+cli_arg = "--source"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8072"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Feed a candump -L log through the same path instead of an interface. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Publish synthetic traffic (three ids, one extended, one FD) marked SYNTHETIC instead of reading an interface. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# What this cog publishes. A cog that reads the bus lists, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "can.frame"
+#   schema = "can.frame.v1"
+#
+# and reads the stream can.frame/<source>. Each record is the can.frame.v1 JSON of one frame
+# (at most 512 bytes); t_ns is the wall clock when the frame was read, not the controller's stamp.
+
+[[outputs]]
+topic = "can.frame"
+schema = "can.frame.v1"
+class = "stream"
+rate = "one record per data frame"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

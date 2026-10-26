@@ -1,0 +1,149 @@
+[cog]
+id = "can-anomaly"
+name = "CAN Anomaly"
+version = "0.1.0"
+category = "industrial"
+description = "Learns what a CAN bus normally looks like and says when it stops looking like that. Reads the can.frame stream of the can-fd cog, spends its first minute counting which ids send and how often, then publishes event.v1 readings: an id that was not on the bus (can.new_id), a length code it never used (can.dlc_change), a periodic id that went quiet or came back (can.id_missing, can.id_back), an id much faster or slower than before (can.rate_high, can.rate_low) and a flooded bus (can.flood, an alert). Counts only: no model, no NPU, and the data bytes are never read. It opens no device and never transmits."
+binary = "cog-can-anomaly-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/anomaly.rs: none (reads a bus stream; opens no device)
+interfaces = ["none"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Watch window (--once)"
+description = "Seconds a single --once run watches for"
+default = 60
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--window"
+
+[config.source]
+type = "string"
+label = "Frame stream"
+description = "Source id of the can.frame stream to learn and watch: can.frame/<source>"
+default = "can0"
+cli_arg = "--source"
+
+[config.name]
+type = "string"
+label = "Name"
+description = "Source id of the events this cog publishes: event/<name>"
+default = "can-anomaly0"
+cli_arg = "--name"
+advanced = true
+
+[config.learn_s]
+type = "integer"
+label = "Learning time"
+description = "Seconds spent learning the bus after start. Start the cog while the bus is doing what is normal."
+default = 30
+min = 2
+max = 3600
+unit = "seconds"
+cli_arg = "--learn-s"
+
+[config.window_s]
+type = "integer"
+label = "Check window"
+description = "Seconds per window in which rates are compared with the baseline"
+default = 5
+min = 1
+max = 600
+unit = "seconds"
+cli_arg = "--window-s"
+advanced = true
+
+[config.rate_high_x]
+type = "string"
+label = "High-rate factor"
+description = "An id above this many times its baseline rate (and 5 frames/s over it) is rate_high"
+default = "3.0"
+cli_arg = "--rate-high-x"
+advanced = true
+
+[config.rate_low_frac]
+type = "string"
+label = "Low-rate fraction"
+description = "An id of 2 frames/s or more below this fraction of its baseline rate, while still sending, is rate_low"
+default = "0.25"
+cli_arg = "--rate-low-frac"
+advanced = true
+
+[config.cooldown_s]
+type = "integer"
+label = "Repeat time"
+description = "Seconds before the same rate event for the same id may repeat"
+default = 30
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--cooldown-s"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8073"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Run a candump -L log through the same engine in virtual time instead of the bus. Events are printed, not published. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Run a synthetic 30 s bus with a new id, a silent id and a burst through the engine in virtual time, marked SYNTHETIC. Events are printed, not published."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# Reads the frame stream and publishes events. A cog that acts on events lists, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "event"
+#   schema = "event.v1"
+#
+# and reads event/<name>.
+
+[[inputs]]
+topic = "can.frame"
+schema = "can.frame.v1"
+policy = "drop-oldest"
+
+[[outputs]]
+topic = "event"
+schema = "event.v1"
+class = "reading"
+rate = "when the bus departs from its baseline"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

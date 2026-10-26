@@ -1,0 +1,24 @@
+[workspace]
+
+[package]
+name = "cog-mcu-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Owns the arduino-router socket and serves the WeftOS MCU sketch as a cogbus service"
+publish = false
+
+[[bin]]
+name = "cog-mcu-bridge"
+path = "src/main.rs"
+
+[dependencies]
+cog-sensor-sources = { path = "../../../crates/cog-sensor-sources" }
+serde_json = "1.0"
+libc = "0.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,30 @@
+# Sensor guide for wake-word (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are Markdown files next to this one (guide/<page>.md).
+
+schema = 1
+title = "A wake phrase gate"
+sensor = "Transcripts from the asr cog"
+cog = "wake-word"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "phrase", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+cog_installed = "setup"
+cog_running = "setup"
+phrase = "phrase"
+no_source = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "transcript/asr0"
+detail = "what was said"
+
+[[flow]]
+name = "wake-word cog"
+detail = "phrase match, armed window"
+
+[[flow]]
+name = "transcript/wake0"
+detail = "the command after the phrase"

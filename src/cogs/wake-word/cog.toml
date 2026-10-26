@@ -1,0 +1,119 @@
+[cog]
+id = "wake-word"
+name = "Wake Word"
+version = "0.1.0"
+category = "ai"
+description = "The wake gate that confirms on the transcript. Reads the transcript.v1 readings of the asr cog and publishes, on transcript/<name>, only the command that follows the wake phrase (default hey arduino; each word of five letters or more may be one edit off). A transcript that is only the phrase arms the gate for a few seconds, and the next transcript is the command. Everything else is ignored and counted. It opens no device and runs no model."
+binary = "cog-wake-word-arm"
+hardware_requirement = ["v0-appliance"]
+# interfaces: src/gate.rs: none (reads and writes bus readings only)
+interfaces = ["none"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously"
+default = 5
+min = 1
+max = 300
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Listen window (--once)"
+description = "Seconds a single --once run listens for"
+default = 10
+min = 1
+max = 120
+unit = "seconds"
+cli_arg = "--window"
+
+[config.phrase]
+type = "string"
+label = "Wake phrase"
+description = "The words that start a command, in order. Case and punctuation are ignored."
+default = "hey arduino"
+cli_arg = "--phrase"
+
+[config.listen_s]
+type = "integer"
+label = "Armed time"
+description = "Seconds after a bare wake phrase in which the next transcript is taken as the command"
+default = 8
+min = 1
+max = 60
+unit = "seconds"
+cli_arg = "--listen-s"
+
+[config.source]
+type = "string"
+label = "Transcript source"
+description = "Source id of the transcripts to gate: transcript/<source>"
+default = "asr0"
+cli_arg = "--source"
+
+[config.name]
+type = "string"
+label = "Name"
+description = "Source id of the commands this cog publishes: transcript/<name>"
+default = "wake0"
+cli_arg = "--name"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback address of the read-only status export"
+default = "127.0.0.1:8068"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.replay]
+type = "string"
+label = "Replay file"
+description = "Gate transcripts from a file of JSON lines {\"text\", \"start_ns\", \"end_ns\"} instead of the bus. Reports are marked REPLAY."
+default = ""
+cli_arg = "--replay"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Run a canned conversation through the gate, marked SYNTHETIC. Nothing is posted to the store."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+# Reads the transcripts of the asr cog and publishes the commands. A cog that acts on commands
+# lists, in its own cog.toml:
+#
+#   [[inputs]]
+#   topic = "transcript"
+#   schema = "transcript.v1"
+#
+# and reads transcript/<name>.
+
+[[inputs]]
+topic = "transcript"
+schema = "transcript.v1"
+policy = "drop-oldest"
+
+[[outputs]]
+topic = "transcript"
+schema = "transcript.v1"
+class = "reading"
+rate = "one per command"
+
+[[outputs]]
+topic = "telemetry"
+schema = "telemetry.v1"
+class = "reading"
+rate = "every report interval"
+
+[console]
+allowed_commands = ["--help", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

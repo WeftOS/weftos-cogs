@@ -1,0 +1,35 @@
+# Sensor guide for mcu-bridge (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are Markdown files next to this one (guide/<page>.md).
+
+schema = 1
+title = "The MCU behind the arduino-router"
+sensor = "STM32 MCU running the WeftOS sketch, reached through arduino-router"
+cog = "mcu-bridge"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "sketch", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+cog_installed = "setup"
+cog_running = "setup"
+sketch = "sketch"
+foreign_sketch = "sketch"
+no_source = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "Calling cog"
+detail = "svc.mcu/venq-mcu, mcu.call.v1"
+
+[[flow]]
+name = "mcu-bridge cog"
+detail = "allowlist, msgpack-RPC"
+
+[[flow]]
+name = "arduino-router"
+detail = "/run/arduino-router.sock"
+
+[[flow]]
+name = "WeftOS sketch"
+detail = "weftos_ping, weftos_calls"

@@ -1,0 +1,34 @@
+# Sensor guide for tts (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are Markdown files next to this one (guide/<page>.md).
+
+schema = 1
+title = "Speech synthesis on a Linux board"
+sensor = "Text from the assistant, spoken through audio-out"
+cog = "tts"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "voice", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+cog_installed = "setup"
+cog_running = "setup"
+voice = "voice"
+no_source = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "transcript/reply0"
+detail = "text to speak"
+
+[[flow]]
+name = "Synthesizer worker"
+detail = "Kokoro or Piper, CPU"
+
+[[flow]]
+name = "Resampler"
+detail = "to 16 kHz mono s16le"
+
+[[flow]]
+name = "audio.pcm/tts0"
+detail = "20 ms chunks, real time"

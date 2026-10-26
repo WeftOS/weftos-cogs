@@ -1,0 +1,25 @@
+[workspace]
+
+[package]
+name = "cog-camera"
+version = "0.1.0"
+edition = "2021"
+description = "Owns a V4L2 camera and publishes video.frame-ref.v1 handles to its JPEG frames"
+publish = false
+
+[[bin]]
+name = "cog-camera"
+path = "src/main.rs"
+
+[dependencies]
+cog-sensor-sources = { path = "../../../crates/cog-sensor-sources" }
+serde_json = "1.0"
+libc = "0.2"
+blake3 = { version = "1.5", features = ["pure"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
