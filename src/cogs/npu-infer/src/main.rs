@@ -108,6 +108,7 @@ fn parse_opts(a: &[String]) -> Opts {
             .map(String::from)
             .or_else(|| std::env::var("WEFTOS_COGBUS").ok()),
         geniex_bin: arg(a, "--geniex-bin")
+            .filter(|s| !s.is_empty())
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from(home).join(".local/bin/geniex")),
         base_port: num(a, "--base-port", 18181, 1024, 65000),
@@ -116,7 +117,9 @@ fn parse_opts(a: &[String]) -> Opts {
         reserve_mib: num(a, "--reserve-mib", 2048, 0, 1_000_000),
         queue: num(a, "--queue", 64, 1, 1024),
         catalog: arg(a, "--catalog").map(PathBuf::from),
-        state_dir: arg(a, "--state-dir").map(PathBuf::from),
+        state_dir: arg(a, "--state-dir")
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from),
         sd_url: match arg(a, "--sd-url") {
             Some("none") => None,
             Some(u) => Some(u.to_string()),

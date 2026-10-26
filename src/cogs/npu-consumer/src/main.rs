@@ -113,7 +113,7 @@ fn parse_opts(a: &[String]) -> Opts {
         calls: num(a, "--calls", 0, 0, u64::MAX),
         duration: Duration::from_secs(num(a, "--duration-secs", 0, 0, 10_000_000)),
         role: arg(a, "--role").unwrap_or("consumer").to_string(),
-        log: arg(a, "--log").map(PathBuf::from),
+        log: arg(a, "--log").filter(|s| !s.is_empty()).map(PathBuf::from),
         watch: a.iter().any(|x| x == "--watch"),
         watch_every: Duration::from_secs(num(a, "--watch-every", 10, 1, 3600)),
         summary_every: Duration::from_secs(num(a, "--summary-secs", 60, 1, 86_400)),

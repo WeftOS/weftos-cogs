@@ -18,6 +18,20 @@ description = "Source id of the service topic svc.infer/<name> on this node"
 default = "venq-npu"
 cli_arg = "--service"
 
+[config.geniex_bin]
+type = "string"
+label = "GenieX wrapper"
+description = "Path of the GenieX wrapper script (the bare binary cannot find its libraries). Empty: $HOME/.local/bin/geniex"
+default = ""
+cli_arg = "--geniex-bin"
+
+[config.state_dir]
+type = "string"
+label = "State directory"
+description = "Where measured model costs and the GenieX logs are kept. Empty: neither is kept"
+default = ""
+cli_arg = "--state-dir"
+
 [config.budget_mib]
 type = "integer"
 label = "Model memory budget"
