@@ -76,9 +76,14 @@ impl GeniexBackend {
         let until = Instant::now() + self.boot_timeout;
         loop {
             if !proc.alive() {
+                let why = proc.diagnostic();
                 return Err(BackendError::new(
                     Fault::LoadFailed,
-                    "geniex exited while starting",
+                    if why.is_empty() {
+                        "geniex exited while starting".to_string()
+                    } else {
+                        format!("geniex exited while starting: {why}")
+                    },
                 ));
             }
             let up = http::request(
@@ -272,9 +277,14 @@ pub(crate) mod fake {
 
     pub struct FakeProc {
         alive: Arc<AtomicBool>,
+        diag: String,
     }
 
     impl Proc for FakeProc {
+        fn diagnostic(&self) -> String {
+            self.diag.clone()
+        }
+
         fn alive(&mut self) -> bool {
             self.alive.load(Ordering::SeqCst)
         }
@@ -291,6 +301,8 @@ pub(crate) mod fake {
     pub struct FakeLauncher {
         pub script: Arc<Script>,
         pub refuse: bool,
+        /// Start and exit at once, leaving this as the server's last words.
+        pub die_with: Option<String>,
     }
 
     fn respond(s: &mut std::net::TcpStream, code: u16, body: &str) {
@@ -305,6 +317,12 @@ pub(crate) mod fake {
         fn spawn(&mut self, port: u16, _: &Entry) -> Result<Box<dyn Proc>, String> {
             if self.refuse {
                 return Err("wrapper not found".into());
+            }
+            if let Some(why) = &self.die_with {
+                return Ok(Box::new(FakeProc {
+                    alive: Arc::new(AtomicBool::new(false)),
+                    diag: why.clone(),
+                }));
             }
             self.script.spawns.fetch_add(1, Ordering::SeqCst);
             // The previous server on this port may still be closing.
@@ -354,7 +372,10 @@ pub(crate) mod fake {
                     }
                 }
             });
-            Ok(Box::new(FakeProc { alive }))
+            Ok(Box::new(FakeProc {
+                alive,
+                diag: String::new(),
+            }))
         }
     }
 }
@@ -377,6 +398,7 @@ mod tests {
             Box::new(FakeLauncher {
                 script: script.clone(),
                 refuse: false,
+                die_with: None,
             }),
             port(),
             1,
@@ -465,11 +487,31 @@ mod tests {
             Box::new(FakeLauncher {
                 script,
                 refuse: true,
+                die_with: None,
             }),
             port(),
             1,
         );
         assert_eq!(b.load(&model()).unwrap_err().fault, Fault::LoadFailed);
+    }
+
+    #[test]
+    fn a_server_that_dies_at_start_tells_why() {
+        let script = Arc::new(Script::default());
+        let l = FakeLauncher {
+            script,
+            refuse: false,
+            die_with: Some("fatal error: failed to reserve page summary memory".into()),
+        };
+        let mut b = GeniexBackend::new(Box::new(l), port(), 1);
+        let e = b.load(&model()).unwrap_err();
+        assert_eq!(e.fault, Fault::LoadFailed);
+        assert!(
+            e.msg
+                .contains("exited while starting: fatal error: failed to reserve"),
+            "{}",
+            e.msg
+        );
     }
 
     #[test]

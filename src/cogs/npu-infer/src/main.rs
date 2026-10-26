@@ -53,6 +53,7 @@ const HELP: &str = "cog-npu-infer: NPU inference service on the node's cogbus
   --service NAME      service name, the source id of svc.infer/NAME (venq-npu)
   --bus PATH          broker socket (default $WEFTOS_COGBUS); token from $WEFTOS_COGBUS_TOKEN
   --geniex-bin PATH   GenieX wrapper (default $HOME/.local/bin/geniex)
+  --geniex-home DIR   $HOME for GenieX (default: the wrapper's <home>/.local/bin parent)
   --base-port N       first loopback port for GenieX servers (18181)
   --slots N           most models resident at once, also the port range (3)
   --budget-mib N      memory the resident models may use together (8000)
@@ -70,6 +71,7 @@ struct Opts {
     service: String,
     bus: Option<String>,
     geniex_bin: PathBuf,
+    geniex_home: Option<PathBuf>,
     base_port: u16,
     slots: u16,
     budget_mib: u64,
@@ -108,6 +110,9 @@ fn parse_opts(a: &[String]) -> Opts {
         bus: arg(a, "--bus")
             .map(String::from)
             .or_else(|| std::env::var("WEFTOS_COGBUS").ok()),
+        geniex_home: arg(a, "--geniex-home")
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from),
         geniex_bin: arg(a, "--geniex-bin")
             .filter(|s| !s.is_empty())
             .map(PathBuf::from)
@@ -288,6 +293,12 @@ fn serve(o: &Opts) -> i32 {
             Box::new(launcher::WrapperLauncher {
                 bin: o.geniex_bin.clone(),
                 log_dir: o.state_dir.clone(),
+                home: o
+                    .geniex_home
+                    .clone()
+                    .or_else(|| launcher::home_of(&o.geniex_bin))
+                    .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
+                    .unwrap_or_else(|| PathBuf::from("/")),
             }),
             o.base_port,
             o.slots,

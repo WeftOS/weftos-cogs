@@ -9,6 +9,14 @@ hardware_requirement = ["v0-appliance"]
 # interfaces: src/launcher.rs, src/geniex.rs: npu (starts GenieX, which opens /dev/fastrpc-cdsp; no other bus)
 interfaces = ["npu"]
 
+# GenieX is a Go program that reserves a large address space and maps model files and NPU
+# buffers; the host applies [resources].ram_mb as an address-space limit (RLIMIT_AS) on the cog and
+# on every child. The default of 256 MiB makes GenieX die at start ("failed to reserve page summary
+# memory"), so the cog asks for the most the host allows. Resident memory is bounded by the
+# cog's own --budget-mib, not by this.
+[resources]
+ram_mb = 65536
+
 [config]
 
 [config.service]
@@ -24,6 +32,14 @@ label = "GenieX wrapper"
 description = "Path of the GenieX wrapper script (the bare binary cannot find its libraries). Empty: $HOME/.local/bin/geniex"
 default = ""
 cli_arg = "--geniex-bin"
+
+[config.geniex_home]
+type = "string"
+label = "GenieX home"
+description = "$HOME for GenieX, which finds its model cache through it. Empty: derived from the wrapper path (<home>/.local/bin/geniex)"
+default = ""
+cli_arg = "--geniex-home"
+advanced = true
 
 [config.state_dir]
 type = "string"
