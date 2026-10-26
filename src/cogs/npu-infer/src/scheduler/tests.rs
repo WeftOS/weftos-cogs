@@ -420,9 +420,10 @@ fn a_model_error_is_reported_without_a_restart() {
     s.submit(job("gemma3-1b", "a", 4, &tx)).ok().unwrap();
     assert_eq!(recv(&rx).1.unwrap_err(), "context_length_exceeded");
     assert_eq!(s.snapshot().counters.restarts, 0);
-    assert_eq!(s.snapshot().counters.failed, 1);
+    // The worker replies before it counts the outcome; joining it makes the count final.
     s.shutdown();
     h.join().unwrap();
+    assert_eq!(s.snapshot().counters.failed, 1);
 }
 
 #[test]
@@ -441,9 +442,10 @@ fn a_call_past_its_deadline_is_dropped_unrun() {
     );
     assert_eq!(recv(&rx).1.unwrap_err(), "expired in the queue");
     assert!(log_of(&log).is_empty(), "no load, no infer");
-    assert_eq!(s.snapshot().counters.expired, 1);
+    // The worker replies before it counts the outcome; joining it makes the count final.
     s.shutdown();
     h.join().unwrap();
+    assert_eq!(s.snapshot().counters.expired, 1);
 }
 
 struct Busy;
@@ -601,7 +603,8 @@ fn a_blob_that_cannot_be_read_fails_the_call_before_any_model_loads() {
         log_of(&log).is_empty(),
         "no load for a call that cannot run"
     );
-    assert_eq!(s.snapshot().counters.failed, 1);
+    // The worker replies before it counts the outcome; joining it makes the count final.
     s.shutdown();
     h.join().unwrap();
+    assert_eq!(s.snapshot().counters.failed, 1);
 }
