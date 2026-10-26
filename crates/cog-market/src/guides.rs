@@ -8,11 +8,19 @@
 
 /// `(cog id, bundle JSON)` for every bundled guide.
 pub const GUIDES: &[(&str, &str)] = &[
+    ("asr", include_str!("../catalog/guides/asr.json")),
+    ("assistant", include_str!("../catalog/guides/assistant.json")),
+    ("audio-in", include_str!("../catalog/guides/audio-in.json")),
+    ("audio-out", include_str!("../catalog/guides/audio-out.json")),
     ("board-telemetry", include_str!("../catalog/guides/board-telemetry.json")),
     ("bridge", include_str!("../catalog/guides/bridge.json")),
+    ("camera", include_str!("../catalog/guides/camera.json")),
+    ("can-anomaly", include_str!("../catalog/guides/can-anomaly.json")),
+    ("can-fd", include_str!("../catalog/guides/can-fd.json")),
     ("hlk-as201", include_str!("../catalog/guides/hlk-as201.json")),
     ("ld1040c-motion", include_str!("../catalog/guides/ld1040c-motion.json")),
     ("ld2450-radar", include_str!("../catalog/guides/ld2450-radar.json")),
+    ("mcu-bridge", include_str!("../catalog/guides/mcu-bridge.json")),
     ("mentra-live", include_str!("../catalog/guides/mentra-live.json")),
     ("rd-03e", include_str!("../catalog/guides/rd-03e.json")),
     ("sdr-pluto-rx", include_str!("../catalog/guides/sdr-pluto-rx.json")),
@@ -20,6 +28,9 @@ pub const GUIDES: &[(&str, &str)] = &[
     ("sen0628-tof", include_str!("../catalog/guides/sen0628-tof.json")),
     ("sound-detect", include_str!("../catalog/guides/sound-detect.json")),
     ("spectrum", include_str!("../catalog/guides/spectrum.json")),
+    ("tts", include_str!("../catalog/guides/tts.json")),
+    ("vision-detect", include_str!("../catalog/guides/vision-detect.json")),
+    ("wake-word", include_str!("../catalog/guides/wake-word.json")),
 ];
 
 /// The bundled guide JSON for a cog, if one ships with the catalog.
