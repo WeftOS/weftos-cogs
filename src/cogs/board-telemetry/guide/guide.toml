@@ -1,0 +1,43 @@
+# Sensor guide for board-telemetry (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are Markdown files next to this one (guide/<page>.md). This cog reads the board it runs
+# on, so there is no header pinout or wiring: the only diagram is the signal flow.
+
+schema = 1
+title = "Board Telemetry on a Linux board"
+sensor = "On-board INA2xx power monitor, fan controller and thermal zones (sysfs)"
+cog = "board-telemetry"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "sources", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+cog_installed = "setup"
+cog_running = "setup"
+export = "setup"
+sources = "sources"
+power = "sources"
+thermal = "sources"
+fan = "sources"
+no_source = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "hwmon / thermal"
+detail = "/sys/class/hwmon, /sys/class/thermal"
+
+[[flow]]
+name = "Find by name"
+detail = "ina2xx, fanN_input, zone type"
+
+[[flow]]
+name = "Window"
+detail = "mean rates, max temperatures"
+
+[[flow]]
+name = "board-telemetry cog"
+detail = "report + 8-float vector"
+
+[[flow]]
+name = "Outputs"
+detail = "stdout JSON, store vector, :8062 export"

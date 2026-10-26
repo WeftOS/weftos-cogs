@@ -6,6 +6,8 @@ category = "network"
 description = "Receives sensor readings from external WeftOS nodes (a Pi 5, an Orange Pi) and writes them into the Seed store, so remote sensing joins the Seed's memory. Readings come from weft-bridge-send; each source gets its own store id. COG-007."
 binary = "cog-bridge-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/net.rs: TCP connect/listen only; no device opened
+interfaces = ["none"]
 
 [config]
 

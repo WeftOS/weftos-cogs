@@ -6,6 +6,8 @@ category = "health"
 description = "Reads an HLK-LD6002 60 GHz radar over USB-serial UART and reports, per window, the radar's own heart-rate, breathing-rate, distance, target-count and presence-flag outputs, the target positions it streams (x/y metres in the radar's own frame, not room coordinates), plus frame and checksum counts. Values the radar did not report in the window are null. The vitals are the module's on-chip estimates, not medical measurements; no pose, no bounding box."
 binary = "cog-ld6002-radar-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/main.rs: open (serialport::new on --device, /dev/ttyUSB0)
+interfaces = ["uart"]
 
 [config]
 

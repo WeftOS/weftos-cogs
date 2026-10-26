@@ -6,6 +6,8 @@ category = "health"
 description = "Reads a DFRobot SEN0213 (AD8232) single-lead ECG through an ADS1115 I2C ADC on the Seed's GPIO header. Exports the raw waveform and a filtered waveform, detects R-peaks (Pan-Tompkins), and reports heart rate, RR intervals, SDNN, RMSSD and a signal-quality score. Flags leads-off, saturation and a flat signal instead of guessing. Not a medical device."
 binary = "cog-sen0213-ecg-arm"
 hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/ads1115.rs: Ads1115::open (/dev/i2c-N, ioctl I2C_SLAVE)
+interfaces = ["i2c"]
 
 [config]
 
