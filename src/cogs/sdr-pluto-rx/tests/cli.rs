@@ -164,6 +164,27 @@ fn a_recorded_window_replays_to_the_same_samples() {
     std::fs::remove_dir_all(&d).ok();
 }
 
+/// A capture of the 2.4 GHz band taken from the Pluto on the Ventuno Q.
+#[test]
+fn a_recorded_capture_from_the_board_replays_as_it_was_taken() {
+    let f =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/wifi-2437-5M.iq");
+    let o = Command::new(BIN)
+        .args(["--once", "--sim-speed", "0", "--replay"])
+        .arg(&f)
+        .output()
+        .unwrap();
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let v: Value = serde_json::from_slice(&o.stdout).unwrap();
+    assert_eq!(v["band"]["centre_hz"], 2_437_000_000u64);
+    assert_eq!(v["band"]["rate_sps"], 5_000_000);
+    assert_eq!(v["samples"]["delivered"], 65_536);
+    assert_eq!(v["counters"]["zero_blocks"], 0);
+    assert_eq!(v["counters"]["dead_receive_path"], false);
+    let p = v["power_dbfs"].as_f64().unwrap();
+    assert!((-25.0..-10.0).contains(&p), "power {p} dBFS");
+}
+
 struct Killer(Child);
 
 impl Drop for Killer {

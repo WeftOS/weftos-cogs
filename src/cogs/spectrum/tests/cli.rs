@@ -185,6 +185,57 @@ fn a_recorded_wifi_capture_has_a_floor_and_a_peak_and_loses_nothing() {
     assert_eq!(occ["uncalibrated"], 0.0);
 }
 
+/// Captures from the same board: the 1090 MHz ADS-B band, a 433.92 MHz ISM channel and the FM
+/// broadcast band at 98 MHz, which is outside the chip's rated range.
+#[test]
+fn recorded_captures_of_other_bands_are_read_with_the_right_labels() {
+    for (name, centre, rate, bw, uncal) in [
+        (
+            "adsb-1090-2M4.iq",
+            1_090_000_000u64,
+            2_400_000u64,
+            1_920_000u64,
+            false,
+        ),
+        ("ism-433-2M.iq", 433_920_000, 2_000_000, 1_600_000, false),
+        ("fm-98-5M.iq", 98_000_000, 5_000_000, 4_000_000, true),
+    ] {
+        let f = fixture(name);
+        let v = run_once(&["--once", "--replay", f.to_str().unwrap()]);
+        let p = &v["psd"];
+        assert_eq!(
+            (
+                p["center_hz"].as_u64(),
+                p["sample_rate_hz"].as_u64(),
+                p["bandwidth_hz"].as_u64()
+            ),
+            (Some(centre), Some(rate), Some(bw)),
+            "{name}"
+        );
+        assert_eq!(p["uncalibrated"], uncal, "{name}");
+        assert_eq!(v["samples"]["used"], 65_536, "{name}");
+        assert_eq!(v["samples"]["loss_fraction"], 0.0, "{name}");
+        let (floor, peak) = (
+            p["floor_dbfs"].as_f64().unwrap(),
+            p["peak_dbfs"].as_f64().unwrap(),
+        );
+        assert!((-110.0..-40.0).contains(&floor), "{name} floor {floor}");
+        assert!(
+            peak > floor + 10.0 && peak < 0.0,
+            "{name} peak {peak} floor {floor}"
+        );
+        assert_eq!(p["bins"].as_array().unwrap().len(), 256);
+        let occ = items(&v["occupancy_reading"]);
+        assert_eq!(occ["uncalibrated"], if uncal { 1.0 } else { 0.0 }, "{name}");
+        assert!(
+            (0.0..0.5).contains(&occ["occ.overall"]),
+            "{name} occupancy {}",
+            occ["occ.overall"]
+        );
+        assert_eq!(occ["band.centre"], centre as f64, "{name}");
+    }
+}
+
 struct Killer(Child);
 
 impl Drop for Killer {

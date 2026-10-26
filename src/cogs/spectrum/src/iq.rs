@@ -86,24 +86,42 @@ pub fn b64_encode_into(b: &[u8], out: &mut Vec<u8>) {
     }
 }
 
+/// Value of each base64 character, or 255.
+const LUT: [u8; 256] = {
+    let mut t = [255u8; 256];
+    let mut i = 0;
+    while i < 64 {
+        t[B64[i] as usize] = i as u8;
+        i += 1;
+    }
+    t
+};
+
 pub fn b64_decode(s: &str) -> Option<Vec<u8>> {
     let b = s.as_bytes();
     if !b.len().is_multiple_of(4) {
         return None;
     }
-    let val = |c: u8| B64.iter().position(|&x| x == c).map(|p| p as u32);
     let mut out = Vec::with_capacity(b.len() / 4 * 3);
-    for (i, q) in b.chunks(4).enumerate() {
-        let last = i == b.len() / 4 - 1;
-        let pad = q.iter().rev().take_while(|&&c| c == b'=').count();
-        if pad > 2 || (pad > 0 && !last) {
+    let quads = b.len() / 4;
+    for (i, q) in b.chunks_exact(4).enumerate() {
+        let pad = if i + 1 == quads {
+            q.iter().rev().take_while(|&&c| c == b'=').count()
+        } else {
+            0
+        };
+        if pad > 2 {
             return None;
         }
         let mut n = 0u32;
         for (j, &c) in q.iter().enumerate() {
             n <<= 6;
             if j < 4 - pad {
-                n |= val(c)?;
+                let v = LUT[c as usize];
+                if v == 255 {
+                    return None;
+                }
+                n |= u32::from(v);
             }
         }
         out.push((n >> 16) as u8);
@@ -115,6 +133,22 @@ pub fn b64_decode(s: &str) -> Option<Vec<u8>> {
         }
     }
     Some(out)
+}
+
+/// Split the `data_b64` text out of a message without copying it into a JSON value: the rest
+/// of the message (with the field emptied) is small. The owner writes the field once, with no
+/// escapes; a message that does not look like that falls back to the full parse.
+fn split_data(b: &[u8]) -> Option<(Vec<u8>, &str)> {
+    const KEY: &[u8] = b"\"data_b64\":\"";
+    let at = b.windows(KEY.len()).position(|w| w == KEY)? + KEY.len();
+    let end = at + b[at..].iter().position(|&c| c == b'"')?;
+    if b[at..end].contains(&b'\\') {
+        return None;
+    }
+    let mut rest = Vec::with_capacity(b.len() - (end - at));
+    rest.extend_from_slice(&b[..at]);
+    rest.extend_from_slice(&b[end..]);
+    Some((rest, std::str::from_utf8(&b[at..end]).ok()?))
 }
 
 impl Header {
@@ -159,11 +193,23 @@ impl Header {
     /// The header and the sample bytes of a record, or why it is not one (this cog reads the
     /// owner's records).
     pub fn decode(b: &[u8]) -> Result<(Header, Vec<u8>), String> {
-        let v: Value = serde_json::from_slice(b).map_err(|e| format!("not JSON: {e}"))?;
+        let (v, text): (Value, std::borrow::Cow<str>) = match split_data(b) {
+            Some((rest, text)) => (
+                serde_json::from_slice(&rest).map_err(|e| format!("not JSON: {e}"))?,
+                std::borrow::Cow::Borrowed(text),
+            ),
+            None => {
+                let v: Value = serde_json::from_slice(b).map_err(|e| format!("not JSON: {e}"))?;
+                let t = v["data_b64"]
+                    .as_str()
+                    .ok_or("data_b64 missing")?
+                    .to_string();
+                (v, std::borrow::Cow::Owned(t))
+            }
+        };
         let u = |k: &str| v[k].as_u64().ok_or_else(|| format!("{k} missing"));
         let n = u("samples")? as u32;
-        let data = b64_decode(v["data_b64"].as_str().ok_or("data_b64 missing")?)
-            .ok_or("data_b64 is not base64")?;
+        let data = b64_decode(&text).ok_or("data_b64 is not base64")?;
         if data.len() != n as usize * 4 {
             return Err(format!(
                 "{n} samples declared, {} bytes present",

@@ -21,7 +21,7 @@
 
 ## Consequences
 
-- The FFT costs about one core's tenth at 5 MS/s on the Ventuno (see the soak notes in WeftOS `docs/plans/pluto-sdr-cogs-plan.md`); a slow reader loses records rather than slowing the owner, and says so in `samples_skipped`.
+- At 5 MS/s the cog uses about half a core on the Ventuno Q (measured over the overnight soak, size-optimized build). Most of that is reading the stream, because each 8192-sample record is a 44 KB base64 JSON message; the first build used a whole core and missed 1.6 percent of the stream until the base64 decode got a lookup table. A reader that cannot keep up loses records rather than slowing the owner, and says so in `samples_skipped`.
 - A band visited rarely, because the owner is busy with other plans, gets a short `coverage` and few frames; the reading says how few.
 - `rf-census` and other decoders can take `band.occupancy` and `spectrum.psd` without touching the stream.
 

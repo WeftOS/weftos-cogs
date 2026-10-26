@@ -27,6 +27,8 @@ pub struct Welch {
     occ: Occupancy,
     stride: u64,
     seen: u64,
+    pw: Vec<f32>,
+    scratch: Vec<f32>,
 }
 
 /// Busy and total cells per slice, and the floor and peak seen.
@@ -130,6 +132,8 @@ impl Welch {
             occ: Occupancy::new(p.slices.max(1)),
             stride: p.stride.max(1),
             seen: 0,
+            pw: vec![0.0; p.n],
+            scratch: Vec::with_capacity(p.n),
         })
     }
 
@@ -171,19 +175,23 @@ impl Welch {
         }
         self.fft.forward(&mut self.re, &mut self.im);
         let h = n / 2;
-        let mut pw = vec![0f32; n];
-        for (k, out) in pw.iter_mut().enumerate() {
-            // fftshift: bin k of the output is FFT index (k + n/2) mod n
-            let src = (k + h) % n;
+        // fftshift: output bin k is FFT index (k + n/2) mod n, so the upper half comes first
+        let mut pw = std::mem::take(&mut self.pw);
+        for k in 0..h {
+            let src = k + h;
             let v = self.re[src] * self.re[src] + self.im[src] * self.im[src];
-            *out = v;
+            pw[k] = v;
             self.acc[k] += f64::from(v);
+            let v = self.re[k] * self.re[k] + self.im[k] * self.im[k];
+            pw[k + h] = v;
+            self.acc[k + h] += f64::from(v);
         }
         self.frames += 1;
         self.seen += 1;
         if self.seen.is_multiple_of(self.stride) {
             self.classify(&pw, p);
         }
+        self.pw = pw;
     }
 
     fn classify(&mut self, pw: &[f32], p: &Params) {
@@ -191,10 +199,13 @@ impl Welch {
         let usable = ((n as f64 * p.usable).round() as usize).clamp(8, n);
         let lo = (n - usable) / 2;
         let band = &pw[lo..lo + usable];
-        let mut scratch: Vec<f32> = band.to_vec();
+        let mut scratch = std::mem::take(&mut self.scratch);
+        scratch.clear();
+        scratch.extend_from_slice(band);
         let mid = scratch.len() / 2;
         let (_, med, _) = scratch.select_nth_unstable_by(mid, f32::total_cmp);
         let floor = (*med).max(1e-12);
+        self.scratch = scratch;
         let thr = floor * 10f32.powf(p.thresh_db as f32 / 10.0);
         let slices = self.occ.busy.len();
         let mut peak = 0f32;

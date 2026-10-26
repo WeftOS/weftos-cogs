@@ -220,6 +220,7 @@ impl Acq {
                 continue;
             }
             self.totals.retunes += 1;
+            self.last_error = None;
             self.hw = radio.hw_status();
             self.totals.segments += 1;
             self.state = "streaming";
