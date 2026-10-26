@@ -53,8 +53,10 @@ docker run --rm ${plat_args[@]+"${plat_args[@]}"} \
       echo "== $cog aarch64-unknown-linux-gnu"
       RUSTFLAGS="-C target-cpu=cortex-a76" cargo build --locked --release --target aarch64-unknown-linux-gnu
       out="/work/.cargo-target/dist/$cog"; mkdir -p "$out"
-      cp "/work/.cargo-target/cross/armv7-unknown-linux-gnueabihf/release/cog-$cog" "$out/cog-$cog-arm"
-      cp "/work/.cargo-target/cross/aarch64-unknown-linux-gnu/release/cog-$cog" "$out/cog-$cog-arm64"
+      # --sparse=never: a binary with zero runs makes cp punch holes in the copy, and the
+      # bind-mounted APFS volume refuses that ("error deallocating: Invalid argument").
+      cp --sparse=never "/work/.cargo-target/cross/armv7-unknown-linux-gnueabihf/release/cog-$cog" "$out/cog-$cog-arm"
+      cp --sparse=never "/work/.cargo-target/cross/aarch64-unknown-linux-gnu/release/cog-$cog" "$out/cog-$cog-arm64"
       arm-linux-gnueabihf-strip "$out/cog-$cog-arm"
       aarch64-linux-gnu-strip "$out/cog-$cog-arm64"
     done
