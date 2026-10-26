@@ -16,6 +16,7 @@ use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Command;
+mod attest;
 mod private;
 use cog_repo::{
     Artifact, COG_ARCHES, CogEntry, Registry, RevokedKeys, SCHEMA, VerifyError, check_signable,
@@ -43,6 +44,10 @@ fn usage() -> ! {
          \t\tFails unless registry.json lists every cog under <src/cogs>, each with arm and arm64.\n\
          \t\tx86_64 is required when <dist-dir>/<id>/cog-<id>-x86_64 exists, and forbidden when it does not.\n\
          \t\tsign still succeeds when only one cog was signable; this command is the release check.\n\
+         sign-file   <file.json> --key <priv.pem> [--out <file.sig>]\n\
+         \t\tDetached Ed25519 signature over the exact bytes of a JSON release document (release-manifest, provenance).\n\
+         verify-file <file.json> [--sig <file.sig>] [--pin <pubkey-hex>]...\n\
+         \t\tChecks that signature against the pinned WeaveLogic key (or each --pin).\n\
          install <repo-url|repo-dir> <cog-id> --seed <user@host> [--arch arm|arm64] [--apps-dir <path>]\n\
          \t\tVerifies the chosen cog, then sideloads the binary + manifest to the Seed (default arch arm).\n\
          \t\tx86_64 is a host registry key. Seed install does not sideload it.\n\n\
@@ -68,6 +73,9 @@ fn main() {
         Some("sign") => cmd_sign(&args[2..]),
         Some("verify") => cmd_verify(&args[2..]),
         Some("check-matrix") => cmd_check_matrix(&args[2..]),
+        Some("sign-file") => load_signing_key(&args[2..])
+            .and_then(|k| attest::cmd_sign_file(&args[2..], &k)),
+        Some("verify-file") => pins(&args[2..]).and_then(|k| attest::cmd_verify_file(&args[2..], k)),
         Some("install") => cmd_install(&args[2..]),
         Some("init") => private::cmd_init(&args[2..]),
         Some("keygen") => private::cmd_keygen(&args[2..]),
@@ -358,7 +366,7 @@ fn positional(args: &[String]) -> Option<&str> {
             skip_value = false;
             continue;
         }
-        if a == "--from" || a == "--cogs" || a == "--key" || a == "--out" || a == "--repo-name" {
+        if a == "--from" || a == "--cogs" || a == "--key" || a == "--out" || a == "--repo-name" || a == "--sig" {
             skip_value = true;
             continue;
         }

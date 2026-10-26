@@ -189,18 +189,60 @@ There are four different keys. Do not mix them up.
 A separate controlled host loads the PKCS#8 PEM or the 64-hex seed and runs:
 
 ```sh
-scripts/release-gate.sh --key /secure/weavelogic-cog-release.pem
+scripts/release-gate.sh --key /secure/weavelogic-cog-release.pem --version v0.1.2
 ```
 
-That runs the cross-build, then:
+The git tree must be clean (`--allow-dirty` overrides that and marks the output). The gate does not create the tag. It runs the cross-build, then:
 
 ```sh
 weft-cog-repo sign --from .cargo-target/dist --out release/repo --key <weavelogic-cog-release.pem>
 weft-cog-repo verify release/repo
 weft-cog-repo check-matrix --from .cargo-target/dist --cogs src/cogs release/repo
+scripts/release-attest.py --repo release/repo --version v0.1.2 --image <builder image> --build-started <time>
+weft-cog-repo sign-file release/repo/release-manifest.json --key <weavelogic-cog-release.pem>
+weft-cog-repo sign-file release/repo/provenance.intoto.json --key <weavelogic-cog-release.pem>
+scripts/release-verify.py release/repo
 ```
 
-`sign` refuses a key whose public half is not `WEAVELOGIC_PUBKEY_HEX`. Each accepted binary is copied with its size, SHA-256, and Ed25519 signature. `registry.json` records those fields. The registry file itself is not signed. `sign` still returns success when at least one directory was signable, and it skips a directory with no `manifest.json`. `check-matrix` fails unless every cog under `src/cogs` is in the registry with `arm` and `arm64`, plus `x86_64` when `cog-<id>-x86_64` is in the dist directory.
+`sign` refuses a key whose public half is not `WEAVELOGIC_PUBKEY_HEX`. Each accepted binary is copied with its size, SHA-256, and Ed25519 signature. `registry.json` records those fields. `registry.json` itself carries no signature; the signed release manifest below covers its SHA-256. `sign` still returns success when at least one directory was signable, and it skips a directory with no `manifest.json`. `check-matrix` fails unless every cog under `src/cogs` is in the registry with `arm` and `arm64`, plus `x86_64` when `cog-<id>-x86_64` is in the dist directory.
+
+### What a release contains, and how to verify it
+
+A compliant release is the `release/repo` tree from the gate, attached to the tag. Besides `registry.json` and the signed binaries under `cogs/<arch>/` it holds:
+
+| File | What it is |
+|---|---|
+| `<cog>/sbom.cdx.json` | CycloneDX 1.5 SBOM for that cog, made from its Cargo manifest with `cargo-cyclonedx` (all targets, so the ARM-only dependencies are in it) |
+| `provenance.intoto.json` | in-toto v1 Statement with a SLSA provenance v1 predicate. Subjects are every binary and SBOM with its SHA-256. It records the source repository URL and exact git commit, the builder image name and image digest, the build start and finish times, and whether the tree was dirty |
+| `release-manifest.json` | release version, commit, source, dirty flag, SHA-256 of `registry.json`, and path, size and SHA-256 of every binary, staged agent manifest, SBOM and the provenance file |
+| `release-manifest.json.sig`, `provenance.intoto.json.sig` | detached Ed25519 signatures over the exact bytes of those two files, as 128 hex characters, made with the WeaveLogic release key |
+
+The cog's own `manifest.json` is unchanged. SBOMs are located through `release-manifest.json`, not through the registry.
+
+To verify a downloaded release (build `weft-cog-repo` from the tagged source with `cargo build --locked --release -p cog-repo`, so the pinned public key is the one in that commit; do not use a binary that came from the release being checked):
+
+```sh
+# 1. every binary: size, SHA-256 and Ed25519 signature against the pinned key
+weft-cog-repo verify ./release-dir
+
+# 2. both documents are signed by the pinned key
+weft-cog-repo verify-file ./release-dir/release-manifest.json
+weft-cog-repo verify-file ./release-dir/provenance.intoto.json
+
+# 3. all of the above plus checksums, SBOMs and provenance in one pass
+scripts/release-verify.py ./release-dir --bin weft-cog-repo
+```
+
+`release-verify.py` fails when a signature does not verify, when any listed file is missing or its SHA-256 or size differs from `release-manifest.json`, when `registry.json` and the manifest disagree about any binary, when the provenance subjects are not exactly the binaries and SBOMs, when the provenance commit or version differs from the manifest, when the builder image has no digest, when an SBOM is not CycloneDX for its cog, when a file in the tree is not listed, and when the release was built from a dirty tree. `shasum -a 256 <file>` checks any single file by hand against its line in `release-manifest.json`. The tagged commit in `release-manifest.json` must be the commit the tag points at: `git rev-parse <tag>^{commit}`.
+
+### Canary before consumers move
+
+A consumer pins the tag, never a branch. Before any consumer moves to a new tag:
+
+1. Run the verification above on the tag's release files.
+2. Pick one test node and install one cog from the tag only: `weft-cog-repo install ./release-dir <cog-id> --seed <user@host>`. Run it and check that it reports honestly (`no_source` without the hardware, data with it).
+3. Leave the other consumers on the previous tag until that cog has run on the test node without a verification, licence or revocation failure.
+4. Move the next consumer, then the rest. To roll back, repoint the consumer at the previous tag; both tags stay immutable, and a published tag is never re-pushed or overwritten.
 
 The WeftOS updater key is a different key. Both tools currently read an environment variable named `WEAVELOGIC_RELEASE_KEY`. Do not use one key for the other. If the private key for the compiled public key is lost, generate a new one outside the repository and change `WEAVELOGIC_PUBKEY_HEX` in a reviewed commit before the release consumers will verify. Those consumers have to receive the new public key before, or in the same upgrade as, the new signatures.
 

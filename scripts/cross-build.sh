@@ -4,6 +4,7 @@
 #
 #   scripts/cross-build.sh              # every cog under src/cogs/
 #   scripts/cross-build.sh <cog-id>...  # named cogs
+#   scripts/cross-build.sh --print-image  # builder image name only
 #
 # Fails if any stripped binary is > 5 MB, warns if > 1 MB, and fails if a requested
 # cog is missing manifest.json, cog-<id>-arm, or cog-<id>-arm64. Stripped binaries
@@ -21,6 +22,9 @@ if [ -n "$PLATFORM" ]; then
   plat_args=(--platform "$PLATFORM")
   IMAGE="$IMAGE-${PLATFORM//\//-}"
 fi
+
+# --print-image: name of the builder image, for release provenance. Builds nothing.
+if [ "${1:-}" = "--print-image" ]; then echo "$IMAGE"; exit 0; fi
 
 cogs=("$@")
 if [ ${#cogs[@]} -eq 0 ]; then

@@ -47,4 +47,6 @@ jobs:
   # checks that registry.json has every cog at arm and arm64 (and x86_64
   # when that binary was built). The uploaded tree is
   # <id>/{manifest.json,cog-<id>-arm,cog-<id>-arm64}. registry.json records
-  # each binary signature. That file itself is not signed.
+  # each binary signature. The gate then writes SBOMs, an in-toto provenance
+  # statement and release-manifest.json, and signs the last two (see
+  # docs/cogs/cog-sources.md).
