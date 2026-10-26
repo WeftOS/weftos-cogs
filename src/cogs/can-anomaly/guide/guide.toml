@@ -1,0 +1,30 @@
+# Sensor guide for can-anomaly (WeftOS ADR-104 sensor-guide format, schema 1).
+# Pages are Markdown files next to this one (guide/<page>.md).
+
+schema = 1
+title = "Spotting what is new on a CAN bus"
+sensor = "The can.frame stream of the can-fd cog"
+cog = "can-anomaly"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "baseline", "setup", "troubleshoot", "api"]
+
+# Checklist step ids the companion app links to a page.
+[links]
+cog_installed = "setup"
+cog_running = "setup"
+baseline = "baseline"
+no_source = "troubleshoot"
+
+# Signal flow, left to right.
+[[flow]]
+name = "can.frame/can0"
+detail = "every data frame"
+
+[[flow]]
+name = "can-anomaly cog"
+detail = "learn ids and rates, then compare"
+
+[[flow]]
+name = "event/can-anomaly0"
+detail = "event.v1"
