@@ -1,0 +1,82 @@
+[cog]
+id = "ld6004-radar"
+name = "LD6004 Radar"
+version = "0.1.0"
+category = "presence"
+description = "Reads a Hi-Link HLK-LD6004 60 GHz 3D presence radar over UART (115200, no parity) and reports checksum-valid target positions in the radar's own frame, zone occupancy, and the module's status fields. It does not report heart rate or breathing rate: this part's protocol does not define them. 0x0A14 is the unattended low-power state, not a rate. Positions leave as spatial.evidence.v1 only when the spatial-evidence feature is compiled and --spatial-out is set. Export is 127.0.0.1:8055."
+binary = "cog-ld6004-radar-arm"
+hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/main.rs: open_port (serialport::new on --device, /dev/ttyUSB0)
+interfaces = ["uart"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Window length"
+description = "Seconds of radar frames aggregated into each output line"
+default = 1
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.device]
+type = "string"
+label = "Serial device"
+description = "Path of the radar's UART (must be under /dev/). A USB-serial adapter avoids the Seed console on /dev/serial0."
+default = "/dev/ttyUSB0"
+cli_arg = "--device"
+
+[config.baud]
+type = "integer"
+label = "Baud rate"
+description = "UART baud. The datasheet states 115200 and no parity. Word length is an assumption; see the ADR."
+default = 115200
+min = 9600
+max = 921600
+unit = "baud"
+cli_arg = "--baud"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Feed documented and synthetic TinyFrame bytes through the real parser. Output is labelled simulated and is not the sensor."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+[config.command]
+type = "select"
+label = "Host command"
+description = "keep sends nothing (default). query-firmware sends the documented 0xFFFF identity query once; it changes no setting. No other command is sent."
+default = "keep"
+options = ["keep", "query-firmware"]
+cli_arg = "--command"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback export. Only 127.0.0.1 is accepted. Default port 8055."
+default = "127.0.0.1:8055"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.source_id]
+type = "string"
+label = "Installed object id"
+description = "Id of this installed radar, not a catalog type and not a person. SenML bn is this id with a trailing slash."
+default = "ld6004-radar"
+cli_arg = "--source-id"
+advanced = true
+
+[api]
+bind_port = 8055
+bind_loopback_only = true
+
+[console]
+allowed_commands = ["--help", "--once", "--once --simulate", "--once --device /dev/ttyUSB0", "--once --command keep"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

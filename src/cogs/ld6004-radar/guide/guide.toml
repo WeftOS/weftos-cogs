@@ -1,0 +1,91 @@
+# Sensor guide for ld6004-radar (WeftOS ADR-104 sensor-guide format, schema 1).
+# One markdown file per page id. Diagram fences embed header, wiring, or flow.
+
+schema = 1
+title = "HLK-LD6004 presence radar on a Cognitum Seed"
+sensor = "Hi-Link HLK-LD6004 60 GHz 3D presence radar"
+cog = "ld6004-radar"
+cog_version = "0.1.0"
+medical = false
+pages = ["start", "sensor", "parts", "wiring", "mounting", "setup", "troubleshoot", "api", "safety", "glossary"]
+
+[links]
+seed_api = "setup"
+cog_installed = "setup"
+cog_running = "setup"
+export = "api"
+sensor_found = "wiring"
+frames = "troubleshoot"
+valid_zones = "mounting"
+level = "mounting"
+noise = "troubleshoot"
+
+[header]
+board = "Raspberry Pi Zero 2 W (Cognitum Seed)"
+orientation = "Header along the top edge, SD card on the left: pin 1 is the top-left pin of the inner row."
+use = [
+  { pin = 1, name = "3V3", to = "HLK-LD6004 pin 5 3V3 (logic reference; see Wiring for current)", color = "red" },
+  { pin = 6, name = "GND", to = "HLK-LD6004 pin 4 GND", color = "black" },
+  { pin = 8, name = "TXD", to = "HLK-LD6004 pin 3 RX0 (only for the firmware query)", color = "blue" },
+  { pin = 10, name = "RXD", to = "HLK-LD6004 pin 2 TX0", color = "green" },
+]
+avoid = [
+  { pin = 2, why = "5 V. The module supply is 3.1-3.5 V. The Pi GPIO is not 5 V tolerant." },
+  { pin = 4, why = "5 V" },
+]
+
+[[parts]]
+id = "sensor"
+name = "HLK-LD6004"
+detail = "60 GHz presence radar, header silkscreen V1.0"
+pins = ["1 OUT", "2 TX0", "3 RX0", "4 GND", "5 3V3"]
+
+[[parts]]
+id = "seed"
+name = "Seed header"
+detail = "Pi Zero 2 W UART"
+pins = ["1 3V3", "6 GND", "8 TXD", "10 RXD"]
+
+[[wires]]
+from = "sensor.5 3V3"
+to = "seed.1 3V3"
+color = "red"
+label = "3.3 V"
+
+[[wires]]
+from = "sensor.4 GND"
+to = "seed.6 GND"
+color = "black"
+label = "GND"
+
+[[wires]]
+from = "sensor.2 TX0"
+to = "seed.10 RXD"
+color = "green"
+label = "module TX to Seed RX"
+
+[[wires]]
+from = "sensor.3 RX0"
+to = "seed.8 TXD"
+color = "blue"
+label = "module RX, query only"
+
+[[flow]]
+name = "HLK-LD6004"
+detail = "60 GHz FMCW, auto-stream"
+
+[[flow]]
+name = "TinyFrame UART"
+detail = "115200, no parity"
+
+[[flow]]
+name = "USB-serial or Seed UART"
+detail = "TX0 to RX"
+
+[[flow]]
+name = "ld6004-radar"
+detail = "checksum, then decode"
+
+[[flow]]
+name = "Outputs"
+detail = "stdout JSON, SenML, :8055"

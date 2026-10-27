@@ -13,6 +13,7 @@ import canFd from "../../../crates/cog-market/catalog/guides/can-fd.json";
 import hlkAs201 from "../../../crates/cog-market/catalog/guides/hlk-as201.json";
 import ld1040cMotion from "../../../crates/cog-market/catalog/guides/ld1040c-motion.json";
 import ld2450Radar from "../../../crates/cog-market/catalog/guides/ld2450-radar.json";
+import ld6004Radar from "../../../crates/cog-market/catalog/guides/ld6004-radar.json";
 import mcuBridge from "../../../crates/cog-market/catalog/guides/mcu-bridge.json";
 import mentraLive from "../../../crates/cog-market/catalog/guides/mentra-live.json";
 import rd03e from "../../../crates/cog-market/catalog/guides/rd-03e.json";
@@ -38,6 +39,7 @@ export const GUIDES: Record<string, unknown> = {
   "hlk-as201": hlkAs201 as unknown,
   "ld1040c-motion": ld1040cMotion as unknown,
   "ld2450-radar": ld2450Radar as unknown,
+  "ld6004-radar": ld6004Radar as unknown,
   "mcu-bridge": mcuBridge as unknown,
   "mentra-live": mentraLive as unknown,
   "rd-03e": rd03e as unknown,

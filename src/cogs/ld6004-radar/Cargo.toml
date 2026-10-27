@@ -1,0 +1,33 @@
+[workspace]
+
+[package]
+name = "cog-ld6004-radar"
+version = "0.1.0"
+edition = "2021"
+description = "HLK-LD6004 60 GHz 3D presence radar reader: checksummed UART frames, target x/y/z, zone flags, fail-honest. Not the LD6002."
+
+[[bin]]
+name = "cog-ld6004-radar"
+path = "src/main.rs"
+
+# `serialport` matches ld6002-radar. default-features = false drops libudev so the
+# Linux cross-build needs no extra system library. The cog opens a caller-supplied
+# path and never enumerates ports.
+[dependencies]
+cog-sensor-sources = { path = "../../../crates/cog-sensor-sources" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serialport = { version = "4", default-features = false }
+
+# Off by default. `spatial-evidence` adds the spatial.evidence.v1 adapter
+# (src/spatial.rs). The default build does not compile it.
+[features]
+default = []
+spatial-evidence = []
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

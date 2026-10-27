@@ -1,0 +1,10 @@
+{
+  "project_id": "ld6004-radar",
+  "module_id": "hlk-ld6004",
+  "category": "presence",
+  "export_port": 8055,
+  "simulate": true,
+  "guide": "/guide",
+  "spec_source": "vendor",
+  "note": "References the existing catalog module hlk-ld6004. Does not redefine that module. The catalog remark that the module needs a 0x08 enable is not this protocol: the HLK-LD6004 presence manual (Hi-Link, September 2025) auto-streams, and 0x08 there is a config write this cog does not send. Spec numbers are vendor figures. Hardware is not yet tested."
+}
