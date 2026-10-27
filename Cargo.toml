@@ -11,6 +11,7 @@ members = [
     "crates/cog-repo",
     "crates/cog-sources",
     "crates/cog-ecg-scope",
+    "crates/cog-ld6004-scope",
     "crates/guide-view",
     "crates/sensor-guide",
     "crates/cog-sound-scope",
