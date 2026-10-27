@@ -15,7 +15,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-IMAGE="weavelogic-cogs-cross:1.97.1"
+# -r2: the image gained the x86_64 cross toolchain; a new tag makes old local images rebuild.
+IMAGE="weavelogic-cogs-cross:1.97.1-r2"
 PLATFORM="${CROSS_PLATFORM:-}"
 plat_args=()
 if [ -n "$PLATFORM" ]; then
