@@ -1,6 +1,27 @@
+<div align="center">
+<a href="https://weftos.weavelogic.ai/docs/weftos/platform/cogs">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WeftOS/.github/main/profile/assets/banner-dark.svg">
+  <img src="https://raw.githubusercontent.com/WeftOS/.github/main/profile/assets/banner.svg" alt="WeftOS Cogs: signed hardware cogs for WeftOS hosts and Cognitum Seeds" width="100%">
+</picture>
+</a>
+
+[![Release](https://img.shields.io/github/v/release/WeftOS/weftos-cogs?label=release&color=2563eb)](https://github.com/WeftOS/weftos-cogs/releases)
+[![WeftOS](https://img.shields.io/github/v/release/WeftOS/weftos?label=weftos&color=0d9488)](https://github.com/WeftOS/weftos/releases)
+[![Docs](https://img.shields.io/badge/docs-weftos.weavelogic.ai-2563eb)](https://weftos.weavelogic.ai/docs/weftos/platform/cogs)
+</div>
+
 # WeftOS Hardware Cogs
 
-Open, signed, per-arch sensor/radar cogs for [Cognitum](https://cognitum.one) Seeds and WeftOS hosts.
+Open, signed, per-arch sensor and radar cogs for [Cognitum](https://cognitum.one) Seeds and
+[WeftOS](https://github.com/WeftOS/weftos) hosts. A cog is a small native program that reads one piece of
+hardware and runs on a node as a signed, governed workload; every released cog is verified against a pinned
+WeaveLogic key before it is trusted. How the Cog Host runs them is documented on the
+[cogs platform page](https://weftos.weavelogic.ai/docs/weftos/platform/cogs).
+
+- 29 cogs in this repository (release v0.1.4)
+- 795 modules and 312 chips in the hardware catalog
+- Built for armv7 (Seed, Pi Zero 2 W) and aarch64 (Pi 5)
 
 A **cog** is a small Rust program that reads one piece of hardware (a radar, a ToF
 imager, an ECG front-end, a mic, an IMU) and emits a JSON line per window plus an
