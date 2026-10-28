@@ -1,0 +1,15 @@
+{
+  "note": "Project fragment only. Do not add a module: hlk-ld1125h-24g already exists in the WeftOS catalog. This file is not applied to catalog.json.",
+  "project": {
+    "id": "ld1125h-radar",
+    "name": "Presence Radar (HLK-LD1125H-24G)",
+    "category": "presence",
+    "difficulty": "moderate",
+    "summary": "Hi-Link HLK-LD1125H-24G 24 GHz FMCW presence radar over UART. ASCII mov/occ lines and one distance in metres. Not a track, not a heart rate, not a breathing rate.",
+    "store_id": 28,
+    "export_port": 8054,
+    "simulate": true,
+    "guide": "/guide",
+    "modules": ["hlk-ld1125h-24g", "pi-zero-2w"]
+  }
+}

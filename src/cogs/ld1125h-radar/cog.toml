@@ -1,0 +1,67 @@
+[cog]
+id = "ld1125h-radar"
+name = "Presence Radar (HLK-LD1125H-24G)"
+version = "0.1.0"
+category = "presence"
+description = "Hi-Link HLK-LD1125H-24G 24 GHz FMCW human-presence radar read over a 3.3 V UART at 115200 8N1. Parses ASCII lines 'mov, dis=<metres>' and 'occ, dis=<metres>' and does not send configuration. Breathing micro-motion is how the module detects a still person. This cog does not report a heart rate, a breathing rate, a track, or a person."
+binary = "cog-ld1125h-radar-arm"
+hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/serial.rs: open (serial port on --device)
+interfaces = ["uart"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between reports while running continuously. A quiet interval is no_frames, not a carried-over distance."
+default = 1
+min = 1
+max = 60
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.window]
+type = "integer"
+label = "Capture window (--once)"
+description = "Seconds of UART text summarized by one --once run"
+default = 2
+min = 1
+max = 30
+unit = "seconds"
+cli_arg = "--window"
+
+[config.device]
+type = "string"
+label = "Serial device"
+description = "UART device under /dev (default /dev/ttyUSB0). /dev/serial0 is the Seed console until the owner frees it."
+default = "/dev/ttyUSB0"
+cli_arg = "--device"
+
+[config.baud]
+type = "integer"
+label = "Baud rate"
+description = "UART speed. The application manual specifies 115200 8N1. Other rates are an operator override, not a documented module setting."
+default = 115200
+min = 9600
+max = 921600
+unit = "bps"
+cli_arg = "--baud"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Feed synthetic vendor-format ASCII lines through the real parser. Output is labelled simulated."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+[api]
+bind_port = 8054
+bind_loopback_only = true
+
+[console]
+allowed_commands = ["--help", "--once", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536
