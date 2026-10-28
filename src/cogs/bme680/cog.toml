@@ -1,0 +1,103 @@
+[cog]
+id = "bme680"
+name = "BME680 environment"
+version = "0.1.0"
+category = "signal"
+description = "Reads a Bosch Sensortec BME680 (gas, pressure, humidity, temperature) over I2C on the Seed's GPIO header, default address 0x76 (0x77 accepted). Emits SenML object readings (RFC 8428): temperature in Cel, humidity in %RH, pressure in Pa, gas resistance in Ohm. Not presence, not a track, not an air-quality index."
+binary = "cog-bme680-arm"
+hardware_requirement = ["pi-zero-2w", "v0-appliance"]
+# interfaces: src/sensor.rs: Bme680::open (/dev/i2c-N, ioctl I2C_SLAVE)
+interfaces = ["i2c"]
+
+[config]
+
+[config.interval]
+type = "integer"
+label = "Report interval"
+description = "Seconds between forced-mode samples while running continuously"
+default = 1
+min = 1
+max = 3600
+unit = "seconds"
+cli_arg = "--interval"
+
+[config.i2c_bus]
+type = "integer"
+label = "I2C bus"
+description = "Linux I2C bus number (/dev/i2c-N). 1 is the GPIO header bus."
+default = 1
+min = 0
+max = 9
+cli_arg = "--i2c-bus"
+advanced = true
+
+[config.i2c_addr]
+type = "integer"
+label = "Sensor address"
+description = "7-bit I2C address. 118 (0x76, SDO to GND) or 119 (0x77, SDO to VDDIO). Other values are refused."
+default = 118
+min = 118
+max = 119
+cli_arg = "--i2c-addr"
+
+[config.source_id]
+type = "string"
+label = "Object id"
+description = "SenML bn for this installed board. Must end with /. This is the object instance, not the catalog type bme680-breakout."
+default = "bme680/"
+cli_arg = "--source-id"
+
+[config.heater_c]
+type = "integer"
+label = "Heater target"
+description = "Gas hot-plate target in degrees Celsius (datasheet quick start uses 300). Used only to program res_heat_0."
+default = 300
+min = 200
+max = 400
+unit = "Cel"
+cli_arg = "--heater-c"
+advanced = true
+
+[config.heat_ms]
+type = "integer"
+label = "Heater duration"
+description = "Gas heater on-time in milliseconds (datasheet quick start uses 100). Encoded into gas_wait_0."
+default = 100
+min = 1
+max = 4032
+unit = "ms"
+cli_arg = "--heat-ms"
+advanced = true
+
+[config.api_bind]
+type = "string"
+label = "Export address"
+description = "Loopback host:port for the read-only export. Only 127.0.0.1 is accepted. Default port 8057."
+default = "127.0.0.1:8057"
+cli_arg = "--api-bind"
+advanced = true
+
+[config.readings_out]
+type = "string"
+label = "SenML file"
+description = "If set, the SenML pack is written here (one JSON array) instead of a second stdout line. Empty means stdout."
+default = ""
+cli_arg = "--readings-out"
+advanced = true
+
+[config.simulate]
+type = "boolean"
+label = "Simulate"
+description = "Run the real compensation on a fixed synthetic calibration image and ADC field. Output is labelled SYNTHETIC. Does not open I2C."
+default = false
+cli_arg = "--simulate"
+advanced = true
+
+[api]
+bind_port = 8057
+bind_loopback_only = true
+
+[console]
+allowed_commands = ["--help", "--once", "--once --simulate"]
+max_runtime_secs = 15
+output_limit_bytes = 65536

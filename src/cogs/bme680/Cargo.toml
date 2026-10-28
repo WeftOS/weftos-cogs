@@ -1,0 +1,28 @@
+[workspace]
+
+[package]
+name = "cog-bme680"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Bosch BME680 gas, pressure, humidity and temperature over I2C. SenML object readings. Fail-honest. Not a presence sensor."
+
+[[bin]]
+name = "cog-bme680"
+path = "src/main.rs"
+
+[dependencies]
+cog-sensor-sources = { path = "../../../crates/cog-sensor-sources" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+libc = "0.2"
+
+# No spatial-evidence feature. ADR-107 and RuView ADR-384 have no record type for
+# temperature, humidity, pressure or gas resistance. See docs/adrs/ADR-174-bme680.md.
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
