@@ -28,6 +28,17 @@ imager, an ECG front-end, a mic, an IMU) and emits a JSON line per window plus a
 8-float vector into the Seed's vector store. Each cog ships `cog.toml` (typed config),
 `src/`, a rendered `guide/` (ADR-104), and tests.
 
+## How a cog works
+
+![Sensor to vector: hardware feeds a cog, the cog emits a JSON line and an 8-float vector per window, and the vector goes to the Seed store or onto a cogbus topic.](docs/assets/readme/sensor-to-vector.svg)
+
+The cog reads one device and windows the signal. For each window it emits a
+JSON line and an 8-float vector. Released cogs can post the vector to the Seed
+store's ingest endpoint (`/api/v1/store/ingest`); new cogs publish it on a
+cogbus topic, which stays on the node until an operator exposes it. See the
+[ingest bridge](docs/cogs/ingest-bridge.md) and the
+[cogs platform page](https://weftos.weavelogic.ai/docs/weftos/platform/cogs).
+
 ## Cogs
 
 | Cog | Sensor | Reads |
@@ -60,6 +71,23 @@ Sensor Explorer, which serves a COG-008 `registry.json` and per-arch downloads.
 Install on a WeftOS host via `cog-sources`, or on a Cognitum Seed via the
 `cogrepo` cog — both verify the signature against the pinned key before trusting
 the bytes. See COG-008 / COG-012 for the trust model.
+
+### Release and signing
+
+![Release and signing flow: cross-build, sign each binary with Ed25519, attach an SBOM and provenance, verify the set, publish registry.json, and installs check the pinned key.](docs/assets/readme/cog-release.svg)
+
+`scripts/release-gate.sh --key <pem> --version <tag>` runs the steps in order. It
+cross-builds, signs each binary with `weft-cog-repo sign` (which refuses a key
+whose public half is not the pinned one), writes a CycloneDX SBOM per cog and
+in-toto provenance, then checks the whole set with `scripts/release-verify.py`.
+It never generates a key and never tags. The signing key stays outside the
+repository; CI does not sign releases.
+
+## Security
+
+Report a vulnerability through the private advisory described in
+[SECURITY.md](SECURITY.md). Contributing notes are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

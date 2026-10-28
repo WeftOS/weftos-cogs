@@ -2,7 +2,7 @@
 
 Report a vulnerability through a GitHub private advisory:
 
-<https://github.com/weave-logic-ai/weftos-cogs/security/advisories/new>
+<https://github.com/WeftOS/weftos-cogs/security/advisories/new>
 
 Do not open a public issue for a security report.
 
