@@ -136,6 +136,11 @@
    "id": "magnetometer",
    "name": "Magnetometer / compass",
    "desc": "3-axis magnetic field sensors used for heading"
+  },
+  {
+   "id": "input",
+   "name": "Human input",
+   "desc": "human input devices: joysticks, buttons and rotary encoders"
   }
  ],
  "assign": [
@@ -2007,6 +2012,27 @@
    "grade": "S",
    "why": "hyperspectral snapshot and line-scan family; catalog spec bands=15 to 150 across ranges inside 460–960 nm, power=1.6 W USB3 class; 2.9 W on listed PCIe rows",
    "confidence": "medium"
+  },
+  {
+   "ref": "module:mcp9808-wcmcu-9808",
+   "type": "temperature",
+   "grade": "C",
+   "why": "generic hobby breakout of a digital temperature IC; no figures in the catalog spec",
+   "confidence": "low"
+  },
+  {
+   "ref": "module:dht11-ky-015",
+   "type": "environmental",
+   "grade": "C",
+   "why": "hobby temperature/humidity module; no figures in the catalog spec",
+   "confidence": "low"
+  },
+  {
+   "ref": "module:ky-023-joystick",
+   "type": "input",
+   "grade": "C",
+   "why": "hobby analog joystick module; no figures in the catalog spec",
+   "confidence": "low"
   }
  ]
 }

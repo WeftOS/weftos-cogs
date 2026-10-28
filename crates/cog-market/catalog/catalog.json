@@ -3337,7 +3337,7 @@
         "a second node that only listens"
       ],
       "notes": [
-        "Product page https://maxbotix.com/products/mb1240 . Pulse width is the ESP32 output: Pololu documents 58 µs/cm and an inverted logic-level serial pin at 9600 8N1, so a normal UART read of TX is backwards. The bare board ships without a header. Order MB1240-000 (bagged). MB1240-040 is the same sensor in a tray. Auto-calibration on the page is voltage, humidity, and noise, not a temperature-compensated sound speed."
+        "Product page https://maxbotix.com/products/mb1240 . Pulse width is the ESP32 output: Pololu documents 58 \u00b5s/cm and an inverted logic-level serial pin at 9600 8N1, so a normal UART read of TX is backwards. The bare board ships without a header. Order MB1240-000 (bagged). MB1240-040 is the same sensor in a tray. Auto-calibration on the page is voltage, humidity, and noise, not a temperature-compensated sound speed."
       ],
       "spec": {
         "type": "42 kHz ultrasonic ToF",
@@ -3346,7 +3346,7 @@
         "rate": "10 Hz",
         "supply": "3.3-5.5 V",
         "current": "3.4 mA average",
-        "temp": "0 °C to 65 °C",
+        "temp": "0 \u00b0C to 65 \u00b0C",
         "interface": "pulse width, analog voltage, inverted RS232 serial",
         "beam": "narrowest in the XL-MaxSonar-EZ line",
         "housing": "bare board, indoor",
@@ -3403,7 +3403,7 @@
         "a digital pulse an ESP32 can time directly"
       ],
       "notes": [
-        "Product page https://maxbotix.com/products/mb1340 . Outputs are analog envelope, analog voltage, and RS232 serial. The serial pin matches the EZ family: inverted logic-level 9600 8N1. Indoor bare board, 0 °C to 65 °C. Hardware gain 250."
+        "Product page https://maxbotix.com/products/mb1340 . Outputs are analog envelope, analog voltage, and RS232 serial. The serial pin matches the EZ family: inverted logic-level 9600 8N1. Indoor bare board, 0 \u00b0C to 65 \u00b0C. Hardware gain 250."
       ],
       "spec": {
         "type": "42 kHz ultrasonic ToF with analog envelope",
@@ -3412,7 +3412,7 @@
         "rate": "10 Hz",
         "supply": "3.3-5.5 V",
         "current": "3.4 mA average",
-        "temp": "0 °C to 65 °C",
+        "temp": "0 \u00b0C to 65 \u00b0C",
         "interface": "analog envelope, analog voltage, inverted RS232 serial",
         "beam": "narrowest in the XL-MaxSonar-AE line",
         "housing": "bare board, indoor",
@@ -3472,7 +3472,7 @@
         "rate": "6 Hz",
         "supply": "2.7-5.5 V",
         "current": "2.9 mA average",
-        "temp": "-40 °C to 65 °C, internal temperature compensation",
+        "temp": "-40 \u00b0C to 65 \u00b0C, internal temperature compensation",
         "interface": "pulse width, analog voltage, TTL serial",
         "beam": "long narrow detection zone",
         "housing": "IP67, 3/4-inch NPS",
@@ -3532,7 +3532,7 @@
         "rate": "about 1.2 Hz",
         "supply": "2.5-5 V (datasheet); product page also prints 3.0-5.5 V",
         "current": "12.2 mA average",
-        "temp": "-40 °C to 65 °C",
+        "temp": "-40 \u00b0C to 65 \u00b0C",
         "interface": "analog envelope, analog voltage, RS232 serial, TTL serial",
         "beam": "long narrow detection zone, 90-degree horn",
         "housing": "IP67 tank housing",
@@ -35997,7 +35997,7 @@
         "a spatial.evidence type for the image frame"
       ],
       "notes": [
-        "Fetched 2026-10-06. Family page: IMX532, IMX531, IMX530. 16.1 Mpix at 160 FPS, 20.3 Mpix at 110 FPS, 24.5 Mpix at 107 FPS on the models table. 32 Gbit/s. Interframe under 1 µs, called out for PIV. Fan and water heatsinks are options, not separate rows."
+        "Fetched 2026-10-06. Family page: IMX532, IMX531, IMX530. 16.1 Mpix at 160 FPS, 20.3 Mpix at 110 FPS, 24.5 Mpix at 107 FPS on the models table. 32 Gbit/s. Interframe under 1 \u00b5s, called out for PIV. Fan and water heatsinks are options, not separate rows."
       ],
       "spec": {
         "type": "camera family, high-speed global shutter",
@@ -36005,7 +36005,7 @@
         "sensors": "Sony Pregius S IMX532, IMX531, IMX530, BSI, global shutter",
         "resolution": "16.1, 20.3, and 24.5 Mpix",
         "frame_rate": "160 / 110 / 107 FPS at those three resolutions",
-        "sync": "short interframe under 1 µs; trigger on the xiX platform",
+        "sync": "short interframe under 1 \u00b5s; trigger on the xiX platform",
         "hosts": "Windows, Linux, macOS, ARM, NVIDIA Jetson",
         "sdk": "GenICam / GenTL and the vendor SDK",
         "source": "https://www.ximea.com/Products/Embedded-system/xiX-Xtreme-high-speed-sony-pregius-s-cameras"
@@ -36233,13 +36233,13 @@
         "a room-surveillance camera"
       ],
       "notes": [
-        "Fetched 2026-10-06. The body says Peltier cooling down to -25 °C and dark current under 0.6 e-/s/pix at -20 °C. The keyfacts line says cooling down to -20 °C. Both are on the same page. Bullets say 4.2 and 15 Mpix; the visible model rows in the fetch are 4.1 Mpix GSENSE2020 BSI and GSENSE400 BSI. Readout noise on those rows is 1.1 to 2.2 e-. Peak QE on the page up to 95%. USB-C with USB PD 2.0, or PCIe. C-mount and M42."
+        "Fetched 2026-10-06. The body says Peltier cooling down to -25 \u00b0C and dark current under 0.6 e-/s/pix at -20 \u00b0C. The keyfacts line says cooling down to -20 \u00b0C. Both are on the same page. Bullets say 4.2 and 15 Mpix; the visible model rows in the fetch are 4.1 Mpix GSENSE2020 BSI and GSENSE400 BSI. Readout noise on those rows is 1.1 to 2.2 e-. Peak QE on the page up to 95%. USB-C with USB PD 2.0, or PCIe. C-mount and M42."
       ],
       "spec": {
         "type": "camera family, cooled scientific sCMOS",
         "interface": "USB3 (USB-C, PD 2.0) or PCIe",
         "sensors": "Gpixel sCMOS, FSI and BSI, including a UV Pulsar row",
-        "cooling": "Peltier; page states -25 °C in the body and -20 °C in keyfacts",
+        "cooling": "Peltier; page states -25 \u00b0C in the body and -20 \u00b0C in keyfacts",
         "bits": "12, 14, 16",
         "dynamic_range": "up to 90 dB in the bullets; one Pulsar row lists 95 dB",
         "form": "down to 52 x 52 x 62 mm",
@@ -36295,14 +36295,14 @@
         "a room-surveillance camera"
       ],
       "notes": [
-        "Fetched 2026-10-06. Family page: GSENSE6060, 37.7 million 10 µm pixels, 61 x 61 mm, up to 46 FPS in the body. Models table lists 6200 x 6144, 110000 e- full well, 4 e- readout noise, 90 dB, 48 FPS, peak QE 95% BSI and 72% FSI. PCIe Gen3 x4, 32 Gbit/s. Dual ADC HDR, RAW 16-bit."
+        "Fetched 2026-10-06. Family page: GSENSE6060, 37.7 million 10 \u00b5m pixels, 61 x 61 mm, up to 46 FPS in the body. Models table lists 6200 x 6144, 110000 e- full well, 4 e- readout noise, 90 dB, 48 FPS, peak QE 95% BSI and 72% FSI. PCIe Gen3 x4, 32 Gbit/s. Dual ADC HDR, RAW 16-bit."
       ],
       "spec": {
         "type": "camera family, cooled medium-format sCMOS",
         "interface": "PCIe Gen3 x4, 32 Gbit/s",
         "sensor": "Gpixel GSENSE6060, FSI or BSI",
         "resolution": "about 37.7 to 38 Mpix, 6200 x 6144 on the table",
-        "pixel": "10 µm",
+        "pixel": "10 \u00b5m",
         "full_well": "110000 e-",
         "readout_noise": "4 e- on the table rows",
         "dynamic_range": "90 dB",
@@ -36419,12 +36419,12 @@
         "a stand-in for a visible RGB room camera"
       ],
       "notes": [
-        "Fetched 2026-10-06. Family page: 26.4 x 26.4 x 31 mm, 32 g, about 1.6 W on USB3 rows and 2.9 W on the PCIe rows shown. Fabry-Perot filters on CMOS pixels (the page spells it Fabry-Perrot). Coverage stated as 460–960 nm with 15–150 bands, and elsewhere 470–960 nm. Frame rate 170 FPS on USB3 or 338–340 FPS on PCIe, depending on the row. Sensors on the visible table are CMV2K mosaic and line-scan parts."
+        "Fetched 2026-10-06. Family page: 26.4 x 26.4 x 31 mm, 32 g, about 1.6 W on USB3 rows and 2.9 W on the PCIe rows shown. Fabry-Perot filters on CMOS pixels (the page spells it Fabry-Perrot). Coverage stated as 460\u2013960 nm with 15\u2013150 bands, and elsewhere 470\u2013960 nm. Frame rate 170 FPS on USB3 or 338\u2013340 FPS on PCIe, depending on the row. Sensors on the visible table are CMV2K mosaic and line-scan parts."
       ],
       "spec": {
         "type": "camera family, hyperspectral",
         "interface": "USB3 or PCIe x2 Gen2",
-        "bands": "15 to 150 across ranges inside 460–960 nm",
+        "bands": "15 to 150 across ranges inside 460\u2013960 nm",
         "modes": "snapshot mosaic and line-scan",
         "form": "26.4 x 26.4 x 31 mm, 32 g",
         "power": "1.6 W USB3 class; 2.9 W on listed PCIe rows",
@@ -36462,6 +36462,292 @@
         }
       ],
       "hash": "wh_f83584503fa988fd"
+    },
+    {
+      "id": "waveshare-2in13-epaper-hat",
+      "name": "Waveshare 2.13\" e-Paper HAT",
+      "vendor": "Waveshare",
+      "kind": "display",
+      "summary": "2.13\" e-Paper display HAT for the Pi 40-pin header.",
+      "good_for": [],
+      "not_for": [],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown."
+      ],
+      "spec": {
+        "interface": "SPI",
+        "resolution": "unknown",
+        "panel_revision": "unknown",
+        "logic": "unknown",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [],
+      "chips": [],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "Waveshare 2.13 e-Paper HAT",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_ca2aca460741b0b5"
+    },
+    {
+      "id": "esp32-c6-devkit",
+      "name": "ESP32-C6 development board",
+      "vendor": "Espressif / generic dev board",
+      "kind": "board",
+      "summary": "ESP32-C6 dev board (exact vendor/variant unknown).",
+      "good_for": [],
+      "not_for": [],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown."
+      ],
+      "spec": {
+        "soc": "ESP32-C6",
+        "flash": "unknown",
+        "psram": "unknown",
+        "usb": "unknown",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [],
+      "chips": [
+        "esp32-c6"
+      ],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "ESP32-C6 devkit",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_be624537ae544487"
+    },
+    {
+      "id": "esp32-s3-n8r2",
+      "name": "ESP32-S3 N8R2 development board",
+      "vendor": "Espressif / generic dev board",
+      "kind": "board",
+      "summary": "ESP32-S3 dev board, N8R2 variant (8 MB flash / 2 MB PSRAM per the N8R2 part code).",
+      "good_for": [],
+      "not_for": [],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown."
+      ],
+      "spec": {
+        "soc": "ESP32-S3",
+        "flash": "8 MB",
+        "psram": "2 MB",
+        "usb": "unknown",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [],
+      "chips": [
+        "esp32-s3"
+      ],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "ESP32-S3 N8R2 devkit",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_73e24ecc64d838b0"
+    },
+    {
+      "id": "mcp9808-wcmcu-9808",
+      "name": "MCP9808 temperature sensor (WCMCU-9808 breakout)",
+      "vendor": "Microchip (sensor); WCMCU generic breakout",
+      "kind": "sensor",
+      "summary": "Digital temperature sensor breakout over I2C @ 0x18.",
+      "good_for": [],
+      "not_for": [],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown."
+      ],
+      "spec": {
+        "measures": "temperature",
+        "interface": "I2C @ 0x18",
+        "accuracy": "unknown",
+        "vin": "unknown",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [
+        "VCC",
+        "GND",
+        "SCL",
+        "SDA"
+      ],
+      "chips": [],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "MCP9808",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_1c11cf4c6bd73869"
+    },
+    {
+      "id": "dht11-ky-015",
+      "name": "DHT11 temperature/humidity module (KY-015)",
+      "vendor": "Aosong (sensor); KY-015 generic module",
+      "kind": "sensor",
+      "summary": "DHT11 temperature + humidity module on the KY-015 board; single-wire digital output.",
+      "good_for": [],
+      "not_for": [],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown."
+      ],
+      "spec": {
+        "measures": "temperature, relative humidity",
+        "interface": "single-wire digital (DHT protocol)",
+        "vin": "unknown",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [],
+      "chips": [],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "DHT11",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_6e9a956fdd80e888"
+    },
+    {
+      "id": "drv8833-board",
+      "name": "DRV8833 dual H-bridge motor driver board",
+      "vendor": "Texas Instruments (driver); generic breakout",
+      "kind": "actuator",
+      "summary": "Dual H-bridge motor driver breakout.",
+      "good_for": [],
+      "not_for": [],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown."
+      ],
+      "spec": {
+        "channels": "2 H-bridges",
+        "interface": "PWM/GPIO inputs",
+        "vm": "unknown",
+        "current": "unknown",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [],
+      "chips": [],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "DRV8833",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_d8067a72d76d51f5"
+    },
+    {
+      "id": "qorvo-dwm3001cdk",
+      "name": "Qorvo DWM3001CDK UWB development kit",
+      "vendor": "Qorvo",
+      "kind": "board",
+      "summary": "Development kit carrying the DWM3001C UWB module.",
+      "good_for": [],
+      "not_for": [],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown."
+      ],
+      "spec": {
+        "module": "DWM3001C",
+        "interface": "unknown",
+        "firmware": "unknown",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [],
+      "chips": [],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "DWM3001CDK",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_b046adb158f6173c"
+    },
+    {
+      "id": "ip5306-charger",
+      "name": "IP5306 Li-ion charge / boost board",
+      "vendor": "Injoinic (IC); generic board",
+      "kind": "board",
+      "summary": "IP5306-based single-cell charge + 5 V boost power board.",
+      "good_for": [],
+      "not_for": [],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown."
+      ],
+      "spec": {
+        "ic": "IP5306",
+        "output": "unknown",
+        "charge_current": "unknown",
+        "input": "unknown",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [],
+      "chips": [],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "IP5306",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_7e36cf737ad8dc2c"
+    },
+    {
+      "id": "type-c-5v-2a-boost-charge",
+      "name": "Type-C 5V 2A boost / charge board",
+      "vendor": "generic",
+      "kind": "board",
+      "summary": "USB Type-C Li-ion charge + 5 V 2 A boost board (IC unknown).",
+      "good_for": [],
+      "not_for": [],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown."
+      ],
+      "spec": {
+        "ic": "unknown",
+        "output": "5 V 2 A (as labelled)",
+        "input": "USB Type-C",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [],
+      "chips": [],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_d2c971821df6e6c3"
+    },
+    {
+      "id": "ky-023-joystick",
+      "name": "KY-023 dual-axis joystick module",
+      "vendor": "generic",
+      "kind": "sensor",
+      "summary": "Dual-axis analog joystick (two potentiometers VRx/VRy) with a push switch SW. No onboard ADC: on a Pi it needs an external ADC.",
+      "good_for": [],
+      "not_for": [
+        "direct Pi GPIO analog read (no ADC)"
+      ],
+      "notes": [
+        "Owned; mounted on the carry deck. Entry is inventory metadata only: fields not verified against a datasheet are marked unknown.",
+        "Run at 3.3 V so the pot outputs stay within 3.3 V ADC/GPIO range. R5 pad = optional pull-up for SW."
+      ],
+      "spec": {
+        "interface": "2x analog (VRx/VRy potentiometers) + digital push switch (SW)",
+        "adc": "none onboard",
+        "vin": "run at 3.3 V",
+        "sw_pullup": "R5 pad (optional)",
+        "pot_resistance": "unknown",
+        "source": "carry-deck inventory (owner list); unverified fields marked unknown"
+      },
+      "pins": [
+        "GND",
+        "+5V (run at 3.3 V)",
+        "VRx",
+        "VRy",
+        "SW"
+      ],
+      "chips": [],
+      "photo": "",
+      "datasheet": "",
+      "mouser_query": "",
+      "buy": [],
+      "seen_in": [],
+      "hash": "wh_b6404ff3481c4c2d"
     }
   ],
   "chips": [
